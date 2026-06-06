@@ -1,0 +1,248 @@
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+export interface Admin {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface Conversation {
+  id: string;
+  type: "GROUP" | "DIRECT";
+  title: string;
+  inviteToken: string;
+  inviteUrl: string;
+  destroyedAt: string | null;
+  createdAt: string;
+  participantCount: number;
+  messageCount: number;
+}
+
+export interface Participant {
+  id: string;
+  displayName: string;
+  phone: string;
+  ipAddress: string;
+  joinedAt: string;
+}
+
+export interface ConversationDetail extends Omit<Conversation, "participantCount"> {
+  participants: Participant[];
+}
+
+export type MessageType = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
+
+export interface ChatMessage {
+  id: string;
+  content: string;
+  type?: MessageType;
+  createdAt: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  attachmentUrl?: string;
+  preview?: string;
+  participant: { id: string; displayName: string };
+}
+
+export interface JoinNotification {
+  id: string;
+  type: "join";
+  displayName: string;
+  joinedAt: string;
+}
+
+export type ChatItem = ChatMessage | JoinNotification;
+
+export function isJoinNotification(item: ChatItem): item is JoinNotification {
+  return "type" in item && item.type === "join";
+}
+
+class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  participantToken?: string
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  const token = localStorage.getItem("adminToken");
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (participantToken) headers["X-Participant-Token"] = participantToken;
+
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new ApiError(data.error ?? "Request failed", res.status);
+  }
+
+  return data as T;
+}
+
+async function uploadRequest<T>(
+  path: string,
+  formData: FormData,
+  participantToken: string
+): Promise<T> {
+  const headers: Record<string, string> = {};
+
+  const token = localStorage.getItem("adminToken");
+  if (token) headers.Authorization = `Bearer ${token}`;
+  headers["X-Participant-Token"] = participantToken;
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new ApiError(data.error ?? "Upload failed", res.status);
+  }
+
+  return data as T;
+}
+
+export function getAttachmentDownloadUrl(
+  conversationId: string,
+  messageId: string,
+  participantToken: string
+): string {
+  const params = new URLSearchParams({ token: participantToken });
+  return `${API_URL}/api/conversations/${conversationId}/attachments/${messageId}?${params}`;
+}
+
+export const api = {
+  login: (email: string, password: string) =>
+    request<{ token: string; admin: Admin }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  getConversations: () => request<Conversation[]>("/api/admin/conversations"),
+
+  getConversation: (id: string) =>
+    request<ConversationDetail>(`/api/admin/conversations/${id}`),
+
+  createConversation: (type: "GROUP" | "DIRECT", title: string) =>
+    request<Conversation>("/api/admin/conversations", {
+      method: "POST",
+      body: JSON.stringify({ type, title }),
+    }),
+
+  demolishConversation: (id: string) =>
+    request<{ success: boolean }>(`/api/admin/conversations/${id}`, {
+      method: "DELETE",
+    }),
+
+  adminJoinConversation: (id: string) =>
+    request<{
+      conversationId: string;
+      sessionToken: string;
+      participantId: string;
+      displayName: string;
+      type: string;
+      title: string;
+      isAdmin: boolean;
+      rejoined: boolean;
+      messages: ChatMessage[];
+      joinEvents: JoinNotification[];
+    }>(`/api/admin/conversations/${id}/join`, { method: "POST" }),
+
+  getJoinInfo: (token: string) =>
+    request<{
+      id: string;
+      type: string;
+      title: string;
+      inviteToken: string;
+      destroyed: boolean;
+    }>(`/api/join/${token}`),
+
+  joinConversation: (token: string, name: string, phone: string) =>
+    request<{
+      conversationId: string;
+      sessionToken: string;
+      participantId: string;
+      displayName: string;
+      type: string;
+      title: string;
+      messages: ChatMessage[];
+      joinEvents: JoinNotification[];
+    }>(`/api/join/${token}`, {
+      method: "POST",
+      body: JSON.stringify({ name, phone }),
+    }),
+
+  getMessages: (conversationId: string, participantToken: string) =>
+    request<{ messages: ChatMessage[]; joinEvents: JoinNotification[] }>(
+      `/api/conversations/${conversationId}/messages`,
+      {},
+      participantToken
+    ),
+
+  getConversationInfo: (conversationId: string, participantToken: string) =>
+    request<{
+      id: string;
+      type: "GROUP" | "DIRECT";
+      title: string;
+      createdAt: string;
+      messageCount: number;
+      participantCount: number;
+      you: {
+        id: string;
+        displayName: string;
+        phone: string;
+        joinedAt: string;
+      };
+      participants: Array<{
+        id: string;
+        displayName: string;
+        phone: string;
+        joinedAt: string;
+      }>;
+      lastMessage: (ChatMessage & { preview?: string }) | null;
+    }>(`/api/conversations/${conversationId}/info`, {}, participantToken),
+
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    participantToken: string
+  ) =>
+    request<{ message: ChatMessage }>(
+      `/api/conversations/${conversationId}/messages`,
+      { method: "POST", body: JSON.stringify({ content }) },
+      participantToken
+    ),
+
+  sendAttachment: (
+    conversationId: string,
+    file: File,
+    participantToken: string,
+    caption?: string
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (caption?.trim()) {
+      formData.append("content", caption.trim());
+    }
+    return uploadRequest<{ message: ChatMessage }>(
+      `/api/conversations/${conversationId}/messages`,
+      formData,
+      participantToken
+    );
+  },
+};
+
+export { ApiError };

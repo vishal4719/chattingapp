@@ -1,0 +1,169 @@
+import { useEffect, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { api, ApiError } from "../lib/api";
+import { formatChatTime } from "../lib/avatar";
+import {
+  clearParticipantSession,
+  getAllParticipantSessions,
+} from "../lib/storage";
+import { Avatar } from "./Avatar";
+import { formatLastMessagePreview } from "./AttachmentBubble";
+
+export interface SidebarChat {
+  conversationId: string;
+  title: string;
+  type: string;
+  displayName: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  isGroup: boolean;
+}
+
+interface Props {
+  onChatsLoaded?: (chats: SidebarChat[]) => void;
+}
+
+export function ChatSidebar({ onChatsLoaded }: Props) {
+  const { conversationId } = useParams();
+  const location = useLocation();
+  const [chats, setChats] = useState<SidebarChat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isAdmin = localStorage.getItem("adminToken") !== null;
+  const adminUser = JSON.parse(localStorage.getItem("adminUser") ?? "{}");
+
+  useEffect(() => {
+    async function load() {
+      const sessions = getAllParticipantSessions();
+      const open: SidebarChat[] = [];
+
+      for (const session of sessions) {
+        try {
+          const info = await api.getConversationInfo(
+            session.conversationId,
+            session.sessionToken
+          );
+          open.push({
+            conversationId: session.conversationId,
+            title: info.title,
+            type: info.type,
+            displayName: session.displayName,
+            lastMessage: info.lastMessage
+              ? formatLastMessagePreview(info.lastMessage)
+              : undefined,
+            lastMessageTime: info.lastMessage?.createdAt,
+            isGroup: info.type === "GROUP",
+          });
+        } catch (err) {
+          if (
+            err instanceof ApiError &&
+            (err.status === 401 || err.status === 404 || err.status === 410)
+          ) {
+            clearParticipantSession(session.conversationId);
+          }
+        }
+      }
+
+      open.sort((a, b) => {
+        const tA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+        const tB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        return tB - tA;
+      });
+
+      setChats(open);
+      onChatsLoaded?.(open);
+      setLoading(false);
+    }
+
+    load();
+  }, [location.pathname, onChatsLoaded]);
+
+  const profileName = isAdmin
+    ? (adminUser.name ?? "Admin")
+    : chats[0]?.displayName ?? "Guest";
+
+  return (
+    <aside className="flex flex-col h-full bg-[var(--wa-panel)] border-r border-[var(--wa-border)] w-full md:w-[420px] shrink-0">
+      <header className="h-[60px] px-4 flex items-center justify-between bg-[var(--wa-header)] shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar name={profileName} size="sm" />
+          <div className="min-w-0">
+            <p className="font-medium truncate text-[15px]">
+              {isAdmin ? adminUser.name ?? "Admin" : "Chats"}
+            </p>
+            {isAdmin && (
+              <p className="text-xs text-[var(--wa-text-secondary)] truncate">
+                {adminUser.email}
+              </p>
+            )}
+          </div>
+        </div>
+        {isAdmin && (
+          <Link
+            to="/admin-dashboard"
+            title="Admin settings"
+            className="p-2 rounded-full hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)]"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-6C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+            </svg>
+          </Link>
+        )}
+      </header>
+
+      <div className="px-3 py-2 bg-[var(--wa-panel)]">
+        <div className="rounded-lg bg-[var(--wa-header)] px-3 py-2 flex items-center gap-3">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="#8696a0">
+            <path d="M15.9 14.3H15l-.3-.3c1-1.1 1.6-2.7 1.6-4.3 0-3.7-3-6.7-6.7-6.7S3 6 3 9.7s3 6.7 6.7 6.7c1.6 0 3.2-.6 4.3-1.6l.3.3v.8l5.1 5.1 1.5-1.5-5-5.2zm-6.2 0c-2.6 0-4.6-2.1-4.6-4.6s2.1-4.6 4.6-4.6 4.6 2.1 4.6 4.6-2 4.6-4.6 4.6z" />
+          </svg>
+          <span className="text-sm text-[var(--wa-text-secondary)]">Search chats</span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto wa-scrollbar">
+        {loading ? (
+          <p className="p-4 text-sm text-[var(--wa-text-secondary)]">Loading chats...</p>
+        ) : chats.length === 0 ? (
+          <p className="p-4 text-sm text-[var(--wa-text-secondary)] text-center">
+            No chats are open
+          </p>
+        ) : (
+          chats.map((chat) => {
+            const active = conversationId === chat.conversationId;
+            return (
+              <Link
+                key={chat.conversationId}
+                to={`/chat/${chat.conversationId}`}
+                state={{ conversationId: chat.conversationId }}
+                className={`flex items-center gap-3 px-3 py-3 border-b border-[var(--wa-border)] hover:bg-[var(--wa-hover)] transition ${
+                  active ? "bg-[var(--wa-hover)]" : ""
+                }`}
+              >
+                <Avatar
+                  name={chat.isGroup ? chat.title : chat.title}
+                  size="md"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <p className="font-medium truncate text-[17px]">{chat.title}</p>
+                    {chat.lastMessageTime && (
+                      <span className="text-xs text-[var(--wa-text-secondary)] shrink-0">
+                        {formatChatTime(chat.lastMessageTime)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-[var(--wa-text-secondary)] truncate">
+                    {chat.lastMessage ?? (
+                      chat.isGroup
+                        ? `${chat.type === "GROUP" ? "Group" : "Direct"} · Tap to open`
+                        : "Tap to chat"
+                    )}
+                  </p>
+                </div>
+              </Link>
+            );
+          })
+        )}
+      </div>
+    </aside>
+  );
+}

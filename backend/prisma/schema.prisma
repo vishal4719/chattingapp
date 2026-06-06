@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConversationType {
+  GROUP
+  DIRECT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+model Admin {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  createdAt     DateTime       @default(now())
+  conversations Conversation[]
+  participants  Participant[]
+}
+
+model Conversation {
+  id               String           @id @default(cuid())
+  type             ConversationType
+  title            String
+  inviteToken      String           @unique
+  createdByAdminId String
+  createdByAdmin   Admin            @relation(fields: [createdByAdminId], references: [id])
+  destroyedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  participants     Participant[]
+  messages         Message[]
+
+  @@index([inviteToken])
+  @@index([destroyedAt])
+}
+
+model Participant {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  adminId        String?
+  admin          Admin?           @relation(fields: [adminId], references: [id])
+  displayName    String
+  phone          String
+  ipAddress      String
+  sessionToken   String           @unique
+  joinedAt       DateTime         @default(now())
+  lastReadAt     DateTime?
+  messages       Message[]
+  messageReceipts MessageReceipt[]
+
+  @@unique([conversationId, adminId])
+  @@index([conversationId])
+  @@index([sessionToken])
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  participantId  String
+  participant    Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  content        String
+  type           MessageType      @default(TEXT)
+  fileName       String?
+  mimeType       String?
+  fileSize       Int?
+  s3Key          String?
+  ipAddress      String
+  createdAt      DateTime         @default(now())
+  receipts       MessageReceipt[]
+
+  @@index([conversationId, createdAt])
+}
+
+model MessageReceipt {
+  id            String      @id @default(cuid())
+  messageId     String
+  message       Message     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  deliveredAt   DateTime?
+  readAt        DateTime?
+
+  @@unique([messageId, participantId])
+  @@index([participantId])
+  @@index([messageId])
+}
