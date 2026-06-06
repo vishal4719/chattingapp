@@ -12,6 +12,14 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Placeholders for `next build` only — runtime env comes from docker-compose / Render.
+ENV FRONTEND_URL=http://localhost:8080 \
+    JWT_SECRET=build-placeholder-not-used-at-runtime \
+    DATABASE_URL=postgresql://build:build@localhost:5432/build \
+    S3_REGION=us-east-1 \
+    S3_BUCKET=build \
+    S3_ACCESS_KEY_ID=build \
+    S3_SECRET_ACCESS_KEY=build
 RUN npx prisma generate && npm run build
 
 FROM base AS runner
