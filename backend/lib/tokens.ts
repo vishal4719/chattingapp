@@ -8,7 +8,8 @@ export function generateSessionToken(): string {
   return uuidv4();
 }
 
+import { getFrontendUrl } from "./env";
+
 export function buildInviteUrl(inviteToken: string): string {
-  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
-  return `${frontendUrl}/join/${inviteToken}`;
+  return `${getFrontendUrl()}/join/${inviteToken}`;
 }

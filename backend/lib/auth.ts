@@ -1,8 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
-
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
+import { getJwtSecret } from "./env";
 
 export interface AdminJwtPayload {
   adminId: string;
@@ -10,12 +9,12 @@ export interface AdminJwtPayload {
 }
 
 export function signAdminToken(payload: AdminJwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
 }
 
 export function verifyAdminToken(token: string): AdminJwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as AdminJwtPayload;
+    return jwt.verify(token, getJwtSecret()) as AdminJwtPayload;
   } catch {
     return null;
   }

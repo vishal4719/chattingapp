@@ -2,10 +2,11 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { initSocket } from "./lib/socket";
+import { getPort } from "./lib/env";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "0.0.0.0";
-const port = parseInt(process.env.PORT ?? "3000", 10);
+const port = getPort();
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -19,6 +20,6 @@ app.prepare().then(() => {
   initSocket(server);
 
   server.listen(port, () => {
-    console.log(`> Backend ready on http://localhost:${port}`);
+    console.log(`> Backend ready on port ${port}`);
   });
 });

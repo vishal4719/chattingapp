@@ -3,6 +3,7 @@ import type { Server as HTTPServer } from "http";
 import { prisma } from "./prisma";
 import { verifyAdminToken } from "./auth";
 import type { MessagePayload } from "./s3";
+import { getFrontendUrl } from "./env";
 import {
   markConversationRead,
   markMessageDelivered,
@@ -23,7 +24,7 @@ function getIO(): SocketIOServer | null {
 export function initSocket(server: HTTPServer): SocketIOServer {
   io = new SocketIOServer(server, {
     cors: {
-      origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
+      origin: getFrontendUrl(),
       methods: ["GET", "POST"],
       credentials: true,
     },

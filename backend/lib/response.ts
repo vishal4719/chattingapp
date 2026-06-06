@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-
-const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
+import { getFrontendUrl } from "./env";
 
 export function corsHeaders(): Record<string, string> {
   return {
-    "Access-Control-Allow-Origin": FRONTEND_URL,
+    "Access-Control-Allow-Origin": getFrontendUrl(),
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers":
       "Content-Type, Authorization, X-Participant-Token",

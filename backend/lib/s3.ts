@@ -6,6 +6,14 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 import type { MessageType } from "@prisma/client";
+import {
+  getMaxUploadBytes as getMaxUploadBytesFromEnv,
+  getS3AccessKeyId,
+  getS3Bucket,
+  getS3Prefix,
+  getS3Region,
+  getS3SecretAccessKey,
+} from "./env";
 
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -33,10 +41,10 @@ let s3Client: S3Client | null = null;
 function getS3Client(): S3Client {
   if (!s3Client) {
     s3Client = new S3Client({
-      region: process.env.S3_REGION ?? "ap-south-1",
+      region: getS3Region(),
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
+        accessKeyId: getS3AccessKeyId(),
+        secretAccessKey: getS3SecretAccessKey(),
       },
     });
   }
@@ -92,8 +100,7 @@ export function inferMessageType(mimeType: string): MessageType {
 }
 
 export function getMaxUploadBytes(): number {
-  const parsed = parseInt(process.env.MAX_UPLOAD_BYTES ?? "26214400", 10);
-  return Number.isFinite(parsed) ? parsed : 26214400;
+  return getMaxUploadBytesFromEnv();
 }
 
 export function validateUploadFile(
@@ -118,7 +125,7 @@ export function buildS3Key(
   senderName: string,
   fileName: string
 ): string {
-  const prefix = process.env.S3_PREFIX ?? "test-chatbot";
+  const prefix = getS3Prefix();
   const safeGroup = sanitizePathSegment(groupTitle);
   const safeSender = sanitizePathSegment(senderName);
   const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
@@ -132,10 +139,7 @@ export async function uploadChatFile(params: {
   mimeType: string;
   buffer: Buffer;
 }): Promise<{ s3Key: string; fileName: string; mimeType: string; fileSize: number }> {
-  const bucket = process.env.S3_BUCKET;
-  if (!bucket) {
-    throw new Error("S3_BUCKET is not configured");
-  }
+  const bucket = getS3Bucket();
 
   const validationError = validateUploadFile(params.mimeType, params.buffer.length);
   if (validationError) {
@@ -162,10 +166,7 @@ export async function uploadChatFile(params: {
 }
 
 export async function getAttachmentUrl(s3Key: string): Promise<string> {
-  const bucket = process.env.S3_BUCKET;
-  if (!bucket) {
-    throw new Error("S3_BUCKET is not configured");
-  }
+  const bucket = getS3Bucket();
 
   return getSignedUrl(
     getS3Client(),
