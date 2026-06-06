@@ -13,6 +13,8 @@ import {
   getParticipantSession,
 } from "../lib/storage";
 import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus } from "../lib/timeline";
+import { getPollIntervalMs } from "../lib/env";
+import { ApiError } from "../lib/api";
 import { formatTypingText } from "../lib/typing";
 import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
@@ -61,11 +63,19 @@ export function Chat() {
   const socketRef = useRef<Socket | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
 
-  const markRead = useCallback((convId: string) => {
-    if (!socketRef.current?.connected) return;
-    socketRef.current.emit("messages:read", { conversationId: convId });
-    window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
-  }, []);
+  const markRead = useCallback(
+    async (convId: string, participantToken: string) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit("messages:read", { conversationId: convId });
+      } else {
+        await api
+          .markConversationRead(convId, participantToken)
+          .catch(() => undefined);
+      }
+      window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+    },
+    []
+  );
 
   const markDelivered = useCallback((convId: string, messageId: string) => {
     if (!socketRef.current?.connected) return;
@@ -137,9 +147,10 @@ export function Chat() {
 
         socket.on("connect", () => {
           setConnected(true);
-          markRead(conversationId!);
+          markRead(conversationId!, stored!.sessionToken);
         });
         socket.on("disconnect", () => setConnected(false));
+        socket.on("connect_error", () => setConnected(false));
 
         socket.on(
           "message:new",
@@ -156,7 +167,7 @@ export function Chat() {
 
             if (msg.participant.id !== stored!.participantId) {
               markDelivered(conversationId!, msg.id);
-              markRead(conversationId!);
+              markRead(conversationId!, stored!.sessionToken);
             }
           }
         );
@@ -289,6 +300,48 @@ export function Chat() {
     };
   }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered]);
 
+  // Poll for new messages when WebSocket is unavailable (e.g. Vercel serverless hosting)
+  useEffect(() => {
+    if (!conversationId || !session || loading || closed || error) return;
+
+    let cancelled = false;
+
+    async function pollMessages() {
+      try {
+        const history = await api.getMessages(
+          conversationId!,
+          session!.sessionToken
+        );
+        if (cancelled) return;
+
+        setItems(buildTimeline(history.messages, history.joinEvents));
+
+        if (!socketRef.current?.connected) {
+          await api
+            .markConversationRead(conversationId!, session!.sessionToken)
+            .catch(() => undefined);
+        }
+      } catch (err) {
+        if (
+          !cancelled &&
+          err instanceof ApiError &&
+          (err.status === 404 || err.status === 410)
+        ) {
+          clearParticipantSession(conversationId!);
+          setClosed(true);
+        }
+      }
+    }
+
+    const interval = setInterval(pollMessages, getPollIntervalMs());
+    pollMessages();
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [conversationId, session, loading, closed, error]);
+
   const emitTypingStart = useCallback(() => {
     if (!conversationId || !socketRef.current?.connected) return;
     socketRef.current.emit("typing:start", { conversationId });
@@ -372,10 +425,10 @@ export function Chat() {
   const subtitle = isAnyoneTyping
     ? formatTypingText(typingNames)
     : isGroup
-      ? `${chatInfo?.participantCount ?? 0} participants${connected ? ", online" : ""}`
+      ? `${chatInfo?.participantCount ?? 0} participants${connected ? ", online" : ", syncing…"}`
       : connected
         ? "online"
-        : "connecting...";
+        : "syncing…";
 
   return (
     <>

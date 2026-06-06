@@ -2,6 +2,9 @@
   "name": "chatapp-backend",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <25"
+  },
   "scripts": {
     "dev": "tsx watch server.ts",
     "build": "prisma generate && next build",
@@ -26,7 +29,9 @@
     "react-dom": "^19.1.0",
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0",
-    "zod": "^3.25.51"
+    "zod": "^3.25.51",
+    "tsx": "^4.19.4",
+    "prisma": "^6.9.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -35,8 +40,6 @@
     "@types/node": "^22.15.29",
     "@types/react": "^19.1.6",
     "@types/uuid": "^10.0.0",
-    "prisma": "^6.9.0",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
 }

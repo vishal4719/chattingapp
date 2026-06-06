@@ -15,3 +15,10 @@ export function getApiUrl(): string {
 export function getWsUrl(): string {
   return requiredVite("VITE_WS_URL");
 }
+
+export function getPollIntervalMs(): number {
+  const raw = import.meta.env.VITE_POLL_INTERVAL_MS?.trim();
+  if (!raw) return 3000;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1000 ? parsed : 3000;
+}
