@@ -17,6 +17,7 @@ export interface SidebarChat {
   lastMessage?: string;
   lastMessageTime?: string;
   isGroup: boolean;
+  unreadCount: number;
 }
 
 interface Props {
@@ -52,6 +53,7 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
               : undefined,
             lastMessageTime: info.lastMessage?.createdAt,
             isGroup: info.type === "GROUP",
+            unreadCount: info.unreadCount ?? 0,
           });
         } catch (err) {
           if (
@@ -75,6 +77,18 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
     }
 
     load();
+
+    const onRefresh = () => load();
+    window.addEventListener("chat:sidebar-refresh", onRefresh);
+    window.addEventListener("focus", onRefresh);
+
+    const interval = setInterval(load, 15000);
+
+    return () => {
+      window.removeEventListener("chat:sidebar-refresh", onRefresh);
+      window.removeEventListener("focus", onRefresh);
+      clearInterval(interval);
+    };
   }, [location.pathname, onChatsLoaded]);
 
   const profileName = isAdmin
@@ -129,6 +143,8 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
         ) : (
           chats.map((chat) => {
             const active = conversationId === chat.conversationId;
+            const hasUnread = chat.unreadCount > 0 && !active;
+
             return (
               <Link
                 key={chat.conversationId}
@@ -144,20 +160,45 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline gap-2">
-                    <p className="font-medium truncate text-[17px]">{chat.title}</p>
+                    <p
+                      className={`truncate text-[17px] ${
+                        hasUnread ? "font-semibold text-[var(--wa-text)]" : "font-medium"
+                      }`}
+                    >
+                      {chat.title}
+                    </p>
                     {chat.lastMessageTime && (
-                      <span className="text-xs text-[var(--wa-text-secondary)] shrink-0">
+                      <span
+                        className={`text-xs shrink-0 ${
+                          hasUnread
+                            ? "text-[var(--wa-green)] font-medium"
+                            : "text-[var(--wa-text-secondary)]"
+                        }`}
+                      >
                         {formatChatTime(chat.lastMessageTime)}
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-[var(--wa-text-secondary)] truncate">
-                    {chat.lastMessage ?? (
-                      chat.isGroup
-                        ? `${chat.type === "GROUP" ? "Group" : "Direct"} · Tap to open`
-                        : "Tap to chat"
+                  <div className="flex justify-between items-center gap-2 mt-0.5">
+                    <p
+                      className={`text-sm truncate ${
+                        hasUnread
+                          ? "font-medium text-[var(--wa-text)]"
+                          : "text-[var(--wa-text-secondary)]"
+                      }`}
+                    >
+                      {chat.lastMessage ?? (
+                        chat.isGroup
+                          ? `${chat.type === "GROUP" ? "Group" : "Direct"} · Tap to open`
+                          : "Tap to chat"
+                      )}
+                    </p>
+                    {hasUnread && (
+                      <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-[var(--wa-green)] text-[#111b21] text-xs font-medium flex items-center justify-center">
+                        {chat.unreadCount > 99 ? "99+" : chat.unreadCount}
+                      </span>
                     )}
-                  </p>
+                  </div>
                 </div>
               </Link>
             );

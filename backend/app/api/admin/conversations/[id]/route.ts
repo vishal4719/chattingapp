@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { buildInviteUrl } from "@/lib/tokens";
+import { assertWorkspaceConversation, getAdminById } from "@/lib/admin-workspace";
 import {
   emitConversationDestroyed,
 } from "@/lib/socket";
@@ -14,10 +15,16 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const admin = requireAdmin(req);
-  if (!admin) return errorResponse("Unauthorized", 401);
+  const jwt = requireAdmin(req);
+  if (!jwt) return errorResponse("Unauthorized", 401);
+
+  const admin = await getAdminById(jwt.adminId);
+  if (!admin) return errorResponse("Admin not found", 404);
 
   const { id } = await context.params;
+
+  const access = await assertWorkspaceConversation(id, admin);
+  if (!access.ok) return errorResponse(access.error, access.status);
 
   const conversation = await prisma.conversation.findUnique({
     where: { id },
@@ -54,12 +61,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
 }
 
 export async function DELETE(req: NextRequest, context: RouteContext) {
-  const admin = requireAdmin(req);
-  if (!admin) return errorResponse("Unauthorized", 401);
+  const jwt = requireAdmin(req);
+  if (!jwt) return errorResponse("Unauthorized", 401);
+
+  const admin = await getAdminById(jwt.adminId);
+  if (!admin) return errorResponse("Admin not found", 404);
 
   const { id } = await context.params;
 
-  const conversation = await prisma.conversation.findUnique({ where: { id } });
+  const access = await assertWorkspaceConversation(id, admin);
+  if (!access.ok) return errorResponse(access.error, access.status);
+
+  const conversation = access.conversation;
 
   if (!conversation) {
     return errorResponse("Conversation not found", 404);

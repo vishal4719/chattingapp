@@ -15,13 +15,34 @@ export function buildTimeline(
 }
 
 export function upsertMessage(items: ChatItem[], msg: ChatMessage): ChatItem[] {
-  if (items.some((i) => !isJoinNotification(i) && i.id === msg.id)) {
-    return items;
+  const existing = items.find(
+    (i) => !isJoinNotification(i) && i.id === msg.id
+  ) as ChatMessage | undefined;
+
+  if (existing) {
+    return items.map((i) =>
+      !isJoinNotification(i) && i.id === msg.id ? { ...i, ...msg } : i
+    );
   }
+
   return buildTimeline(
     [...items.filter((i) => !isJoinNotification(i)), msg] as ChatMessage[],
     items.filter(isJoinNotification) as JoinNotification[]
   );
+}
+
+export function updateMessageStatus(
+  items: ChatItem[],
+  messageId: string,
+  status: import("./api").MessageStatus
+): ChatItem[] {
+  return items.map((item) => {
+    if (isJoinNotification(item)) return item;
+    if (item.id === messageId) {
+      return { ...item, status };
+    }
+    return item;
+  });
 }
 
 export function upsertJoinEvent(

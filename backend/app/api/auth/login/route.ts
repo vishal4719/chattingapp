@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { comparePassword, signAdminToken } from "@/lib/auth";
+import { formatAdminPublic } from "@/lib/admin-workspace";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
 
 const loginSchema = z.object({
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     return jsonResponse({
       token,
-      admin: { id: admin.id, email: admin.email, name: admin.name },
+      admin: formatAdminPublic(admin),
     });
   } catch {
     return errorResponse("Login failed", 500);

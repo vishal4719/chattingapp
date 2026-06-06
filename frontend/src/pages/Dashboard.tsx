@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, Conversation, ConversationDetail } from "../lib/api";
 import { Avatar } from "../components/Avatar";
+import { AdminSettings } from "../components/AdminSettings";
 import { saveParticipantSession } from "../lib/storage";
 
 export function Dashboard() {
@@ -14,8 +15,22 @@ export function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [copyLabel, setCopyLabel] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
+  const [adminProfile, setAdminProfile] = useState<{
+    accessType?: string;
+    isWorkspaceOwner?: boolean;
+  }>({});
 
   const adminUser = JSON.parse(localStorage.getItem("adminUser") ?? "{}");
+
+  async function loadAdminProfile() {
+    try {
+      const { admin } = await api.getAdminMe();
+      setAdminProfile(admin);
+      localStorage.setItem("adminUser", JSON.stringify(admin));
+    } catch {
+      setAdminProfile(adminUser);
+    }
+  }
 
   async function loadConversations() {
     try {
@@ -30,6 +45,7 @@ export function Dashboard() {
 
   useEffect(() => {
     loadConversations();
+    loadAdminProfile();
   }, []);
 
   async function handleCreate(type: "GROUP" | "DIRECT") {
@@ -136,6 +152,7 @@ export function Dashboard() {
             <h1 className="text-[17px] font-normal">Admin</h1>
             <p className="text-xs text-[var(--wa-text-secondary)]">
               {adminUser.email}
+              {adminProfile.accessType === "SHARED" && " · Shared admin"}
             </p>
           </div>
         </div>
@@ -184,6 +201,10 @@ export function Dashboard() {
             </button>
           </div>
         </section>
+
+        <AdminSettings
+          isWorkspaceOwner={adminProfile.isWorkspaceOwner ?? true}
+        />
 
         {error && (
           <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-4 py-2">

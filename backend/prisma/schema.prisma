@@ -12,6 +12,11 @@ enum ConversationType {
   DIRECT
 }
 
+enum AdminAccessType {
+  INDEPENDENT
+  SHARED
+}
+
 enum MessageType {
   TEXT
   IMAGE
@@ -20,13 +25,22 @@ enum MessageType {
 }
 
 model Admin {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  passwordHash  String
-  name          String
-  createdAt     DateTime       @default(now())
-  conversations Conversation[]
-  participants  Participant[]
+  id               String         @id @default(cuid())
+  email            String         @unique
+  passwordHash     String
+  name             String
+  accessType       AdminAccessType @default(INDEPENDENT)
+  workspaceAdminId String?
+  workspaceAdmin   Admin?         @relation("WorkspaceMembers", fields: [workspaceAdminId], references: [id])
+  workspaceMembers Admin[]        @relation("WorkspaceMembers")
+  createdByAdminId String?
+  createdByAdmin   Admin?         @relation("CreatedAdmins", fields: [createdByAdminId], references: [id])
+  createdAdmins    Admin[]        @relation("CreatedAdmins")
+  createdAt        DateTime       @default(now())
+  conversations    Conversation[]
+  participants     Participant[]
+
+  @@index([workspaceAdminId])
 }
 
 model Conversation {
@@ -36,6 +50,7 @@ model Conversation {
   inviteToken      String           @unique
   createdByAdminId String
   createdByAdmin   Admin            @relation(fields: [createdByAdminId], references: [id])
+  workspaceAdminId String?
   destroyedAt      DateTime?
   createdAt        DateTime         @default(now())
   participants     Participant[]
@@ -43,6 +58,7 @@ model Conversation {
 
   @@index([inviteToken])
   @@index([destroyedAt])
+  @@index([workspaceAdminId])
 }
 
 model Participant {

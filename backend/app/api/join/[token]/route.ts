@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       },
     });
 
-    const history = await getConversationHistory(conversation.id);
+    const history = await getConversationHistory(conversation.id, participant.id);
 
     // Exclude the new joiner's own join event — others see it live via socket
     const joinEvents = history.joinEvents.filter(

@@ -4,6 +4,7 @@ import { isJoinNotification } from "../lib/api";
 import { formatMessageTime, getAvatarColor } from "../lib/avatar";
 import { Avatar } from "./Avatar";
 import { TypingIndicator } from "./TypingIndicator";
+import { MessageStatusTicks } from "./MessageStatusTicks";
 import { AttachmentBubble, isAttachmentMessage } from "./AttachmentBubble";
 
 interface Props {
@@ -101,9 +102,12 @@ export function MessageList({
                   {item.content}
                 </p>
               )}
-              <p className="text-[11px] text-[var(--wa-text-secondary)] text-right mt-0.5 px-1 -mb-0.5">
-                {formatMessageTime(item.createdAt)}
-              </p>
+              <div className="flex items-center justify-end gap-0.5 mt-0.5 px-1 -mb-0.5">
+                <span className="text-[11px] text-[var(--wa-text-secondary)]">
+                  {formatMessageTime(item.createdAt)}
+                </span>
+                {isOwn && <MessageStatusTicks status={item.status} />}
+              </div>
             </div>
           </div>
         );

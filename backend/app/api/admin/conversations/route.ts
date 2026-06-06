@@ -4,6 +4,7 @@ import { ConversationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { buildInviteUrl, generateInviteToken } from "@/lib/tokens";
+import { getAdminById, getWorkspaceId } from "@/lib/admin-workspace";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
 
 const createSchema = z.object({
@@ -16,10 +17,24 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: NextRequest) {
-  const admin = requireAdmin(req);
-  if (!admin) return errorResponse("Unauthorized", 401);
+  const jwt = requireAdmin(req);
+  if (!jwt) return errorResponse("Unauthorized", 401);
+
+  const admin = await getAdminById(jwt.adminId);
+  if (!admin) return errorResponse("Admin not found", 404);
+
+  const workspaceId = getWorkspaceId(admin);
 
   const conversations = await prisma.conversation.findMany({
+    where: {
+      OR: [
+        { workspaceAdminId: workspaceId },
+        {
+          workspaceAdminId: null,
+          createdByAdminId: workspaceId,
+        },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { participants: true, messages: true } },
@@ -42,8 +57,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const admin = requireAdmin(req);
-  if (!admin) return errorResponse("Unauthorized", 401);
+  const jwt = requireAdmin(req);
+  if (!jwt) return errorResponse("Unauthorized", 401);
+
+  const admin = await getAdminById(jwt.adminId);
+  if (!admin) return errorResponse("Admin not found", 404);
+
+  const workspaceId = getWorkspaceId(admin);
 
   try {
     const body = await req.json();
@@ -59,7 +79,8 @@ export async function POST(req: NextRequest) {
         type: parsed.data.type as ConversationType,
         title: parsed.data.title,
         inviteToken,
-        createdByAdminId: admin.adminId,
+        createdByAdminId: admin.id,
+        workspaceAdminId: workspaceId,
       },
     });
 

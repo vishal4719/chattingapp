@@ -12,7 +12,7 @@ import {
   clearParticipantSession,
   getParticipantSession,
 } from "../lib/storage";
-import { buildTimeline, upsertJoinEvent, upsertMessage } from "../lib/timeline";
+import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus } from "../lib/timeline";
 import { formatTypingText } from "../lib/typing";
 import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
@@ -61,6 +61,20 @@ export function Chat() {
   const socketRef = useRef<Socket | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
 
+  const markRead = useCallback((convId: string) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit("messages:read", { conversationId: convId });
+    window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+  }, []);
+
+  const markDelivered = useCallback((convId: string, messageId: string) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit("message:delivered", {
+      conversationId: convId,
+      messageId,
+    });
+  }, []);
+
   useEffect(() => {
     if (!conversationId) return;
 
@@ -108,6 +122,11 @@ export function Chat() {
         setItems(buildTimeline(history.messages, history.joinEvents));
         setChatInfo(info);
 
+        await api
+          .markConversationRead(conversationId!, stored!.sessionToken)
+          .catch(() => undefined);
+        window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+
         const socket = createChatSocket({
           participantToken: stored!.sessionToken,
           adminJwt: localStorage.getItem("adminToken") ?? undefined,
@@ -116,7 +135,10 @@ export function Chat() {
 
         setupRoomJoin(socket, conversationId!);
 
-        socket.on("connect", () => setConnected(true));
+        socket.on("connect", () => {
+          setConnected(true);
+          markRead(conversationId!);
+        });
         socket.on("disconnect", () => setConnected(false));
 
         socket.on(
@@ -131,6 +153,30 @@ export function Chat() {
               return next;
             });
             setItems((prev) => upsertMessage(prev, msg));
+
+            if (msg.participant.id !== stored!.participantId) {
+              markDelivered(conversationId!, msg.id);
+              markRead(conversationId!);
+            }
+          }
+        );
+
+        socket.on(
+          "message:status",
+          (payload: {
+            conversationId?: string;
+            messageId: string;
+            status: ChatMessage["status"];
+          }) => {
+            if (
+              payload.conversationId &&
+              payload.conversationId !== conversationId
+            ) {
+              return;
+            }
+            setItems((prev) =>
+              updateMessageStatus(prev, payload.messageId, payload.status!)
+            );
           }
         );
 
@@ -241,7 +287,7 @@ export function Chat() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [conversationId, navigate, isAdmin, location.state]);
+  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered]);
 
   const emitTypingStart = useCallback(() => {
     if (!conversationId || !socketRef.current?.connected) return;

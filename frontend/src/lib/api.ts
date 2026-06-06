@@ -4,6 +4,10 @@ export interface Admin {
   id: string;
   email: string;
   name: string;
+  accessType?: "INDEPENDENT" | "SHARED";
+  workspaceAdminId?: string;
+  isWorkspaceOwner?: boolean;
+  createdAt?: string;
 }
 
 export interface Conversation {
@@ -31,11 +35,13 @@ export interface ConversationDetail extends Omit<Conversation, "participantCount
 }
 
 export type MessageType = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
+export type MessageStatus = "SENT" | "DELIVERED" | "READ";
 
 export interface ChatMessage {
   id: string;
   content: string;
   type?: MessageType;
+  status?: MessageStatus;
   createdAt: string;
   fileName?: string | null;
   mimeType?: string | null;
@@ -131,6 +137,22 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  getAdminMe: () => request<{ admin: Admin }>("/api/admin/me"),
+
+  getWorkspaceAdmins: () =>
+    request<{ admins: Admin[] }>("/api/admin/admins"),
+
+  createAdmin: (data: {
+    name: string;
+    email: string;
+    password: string;
+    accessType: "SHARED" | "INDEPENDENT";
+  }) =>
+    request<{ admin: Admin }>("/api/admin/admins", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   getConversations: () => request<Conversation[]>("/api/admin/conversations"),
 
   getConversation: (id: string) =>
@@ -213,7 +235,16 @@ export const api = {
         joinedAt: string;
       }>;
       lastMessage: (ChatMessage & { preview?: string }) | null;
+      unreadCount: number;
+      lastMessageIsUnread?: boolean;
     }>(`/api/conversations/${conversationId}/info`, {}, participantToken),
+
+  markConversationRead: (conversationId: string, participantToken: string) =>
+    request<{ success: boolean; unreadCount: number }>(
+      `/api/conversations/${conversationId}/read`,
+      { method: "POST" },
+      participantToken
+    ),
 
   sendMessage: (
     conversationId: string,
