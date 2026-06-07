@@ -350,6 +350,23 @@ export const api = {
       },
       participantToken
     ),
+
+  getCallToken: (
+    conversationId: string,
+    participantToken: string,
+    callType: "video" | "audio" = "video"
+  ) =>
+    request<{
+      token: string;
+      roomName: string;
+      livekitUrl: string;
+      participantName: string;
+      callType: "video" | "audio";
+    }>(
+      `/api/conversations/${conversationId}/calls/token`,
+      { method: "POST", body: JSON.stringify({ callType }) },
+      participantToken
+    ),
 };
 
 export async function syncUserConversations(): Promise<void> {

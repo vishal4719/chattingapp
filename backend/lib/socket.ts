@@ -170,6 +170,93 @@ export function initSocket(server: HTTPServer): SocketIOServer {
         });
       }
     );
+
+    socket.on(
+      "call:start",
+      (data: { conversationId: string; callType: "video" | "audio" }) => {
+        const participantId = socket.data.participantId as string | undefined;
+        const displayName = socket.data.displayName as string | undefined;
+        const joinedConv = socket.data.conversationId as string | undefined;
+
+        if (
+          !participantId ||
+          !displayName ||
+          !data.conversationId ||
+          data.conversationId !== joinedConv
+        ) {
+          return;
+        }
+
+        socket.to(`conv:${data.conversationId}`).emit("call:incoming", {
+          conversationId: data.conversationId,
+          callType: data.callType,
+          callerId: participantId,
+          callerName: displayName,
+        });
+      }
+    );
+
+    socket.on(
+      "call:accept",
+      (data: { conversationId: string; callType: "video" | "audio" }) => {
+        const participantId = socket.data.participantId as string | undefined;
+        const displayName = socket.data.displayName as string | undefined;
+        const joinedConv = socket.data.conversationId as string | undefined;
+
+        if (
+          !participantId ||
+          !displayName ||
+          data.conversationId !== joinedConv
+        ) {
+          return;
+        }
+
+        socket.to(`conv:${data.conversationId}`).emit("call:accepted", {
+          conversationId: data.conversationId,
+          callType: data.callType,
+          participantId,
+          participantName: displayName,
+        });
+      }
+    );
+
+    socket.on(
+      "call:decline",
+      (data: { conversationId: string; callerId: string }) => {
+        const participantId = socket.data.participantId as string | undefined;
+        const displayName = socket.data.displayName as string | undefined;
+        const joinedConv = socket.data.conversationId as string | undefined;
+
+        if (
+          !participantId ||
+          !displayName ||
+          data.conversationId !== joinedConv
+        ) {
+          return;
+        }
+
+        io?.to(`conv:${data.conversationId}`).emit("call:declined", {
+          conversationId: data.conversationId,
+          participantId,
+          participantName: displayName,
+          callerId: data.callerId,
+        });
+      }
+    );
+
+    socket.on("call:end", (data: { conversationId: string }) => {
+      const participantId = socket.data.participantId as string | undefined;
+      const joinedConv = socket.data.conversationId as string | undefined;
+
+      if (!participantId || data.conversationId !== joinedConv) {
+        return;
+      }
+
+      socket.to(`conv:${data.conversationId}`).emit("call:ended", {
+        conversationId: data.conversationId,
+        endedBy: participantId,
+      });
+    });
   });
 
   return io;

@@ -9,6 +9,16 @@ import {
 } from "../lib/api";
 import { createChatSocket, setupRoomJoin } from "../lib/socket";
 import {
+  type CallState,
+  type CallType,
+  type IncomingCallPayload,
+  emitCallAccept,
+  emitCallDecline,
+  emitCallEnd,
+  emitCallStart,
+  onCallIncoming,
+} from "../lib/calls";
+import {
   clearParticipantSession,
   getParticipantSession,
   saveParticipantSession,
@@ -21,6 +31,8 @@ import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { Avatar } from "../components/Avatar";
 import { ChatInfoPanel } from "../components/ChatInfoPanel";
+import { CallOverlay } from "../components/CallOverlay";
+import { IncomingCallModal } from "../components/IncomingCallModal";
 
 interface ChatLocationState {
   conversationId?: string;
@@ -61,8 +73,24 @@ export function Chat() {
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(
     () => new Map()
   );
+  const [callState, setCallState] = useState<CallState>("idle");
+  const [callType, setCallType] = useState<CallType>("video");
+  const [callToken, setCallToken] = useState<string | null>(null);
+  const [livekitUrl, setLivekitUrl] = useState<string | null>(null);
+  const [incomingCall, setIncomingCall] = useState<IncomingCallPayload | null>(
+    null
+  );
+  const [callJoining, setCallJoining] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
+
+  const resetCallState = useCallback(() => {
+    setCallState("idle");
+    setCallToken(null);
+    setLivekitUrl(null);
+    setIncomingCall(null);
+    setCallJoining(false);
+  }, []);
 
   const markRead = useCallback(
     async (convId: string, participantToken: string) => {
@@ -98,6 +126,7 @@ export function Chat() {
     setConnected(false);
     setTypingUsers(new Map());
     setLoading(true);
+    resetCallState();
 
     const stored = getParticipantSession(conversationId);
     if (!stored) {
@@ -274,6 +303,7 @@ export function Chat() {
           ) {
             return;
           }
+          resetCallState();
           clearParticipantSession(conversationId!);
           setClosed(true);
           socket.disconnect();
@@ -282,6 +312,22 @@ export function Chat() {
             3000
           );
         });
+
+        onCallIncoming(socket, (payload) => {
+          if (payload.conversationId !== conversationId) return;
+          if (payload.callerId === stored!.participantId) return;
+          setIncomingCall(payload);
+          setCallType(payload.callType);
+          setCallState("incoming");
+        });
+
+        socket.on(
+          "call:ended",
+          (payload: { conversationId: string; endedBy: string }) => {
+            if (payload.conversationId !== conversationId) return;
+            resetCallState();
+          }
+        );
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load chat");
@@ -299,7 +345,7 @@ export function Chat() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered]);
+  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered, resetCallState]);
 
   // Poll only when WebSocket is disconnected (e.g. serverless fallback)
   useEffect(() => {
@@ -440,6 +486,79 @@ export function Chat() {
     setItems((prev) => upsertMessage(prev, message));
   }
 
+  async function startCall(type: CallType) {
+    if (!conversationId || !session || callState === "active") return;
+
+    setCallJoining(true);
+    setCallType(type);
+    try {
+      const data = await api.getCallToken(
+        conversationId,
+        session.sessionToken,
+        type
+      );
+      setCallToken(data.token);
+      setLivekitUrl(data.livekitUrl);
+      if (socketRef.current?.connected) {
+        emitCallStart(socketRef.current, conversationId, type);
+      }
+      setCallState("active");
+      setIncomingCall(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start call");
+      resetCallState();
+    } finally {
+      setCallJoining(false);
+    }
+  }
+
+  async function acceptIncomingCall() {
+    if (!conversationId || !session || !incomingCall) return;
+
+    setCallJoining(true);
+    setCallType(incomingCall.callType);
+    try {
+      const data = await api.getCallToken(
+        conversationId,
+        session.sessionToken,
+        incomingCall.callType
+      );
+      setCallToken(data.token);
+      setLivekitUrl(data.livekitUrl);
+      if (socketRef.current?.connected) {
+        emitCallAccept(
+          socketRef.current,
+          conversationId,
+          incomingCall.callType
+        );
+      }
+      setIncomingCall(null);
+      setCallState("active");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not join call");
+      resetCallState();
+    } finally {
+      setCallJoining(false);
+    }
+  }
+
+  function declineIncomingCall() {
+    if (!conversationId || !incomingCall || !socketRef.current) return;
+    emitCallDecline(
+      socketRef.current,
+      conversationId,
+      incomingCall.callerId
+    );
+    resetCallState();
+  }
+
+  function endCall() {
+    if (conversationId && socketRef.current?.connected) {
+      emitCallEnd(socketRef.current, conversationId);
+    }
+    resetCallState();
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[var(--wa-header)] text-[var(--wa-text-secondary)]">
@@ -522,16 +641,40 @@ export function Chat() {
           </div>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setInfoOpen(true)}
-          className="p-2 rounded-full hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)]"
-          title="Group info"
-        >
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => startCall("video")}
+            disabled={callJoining || callState === "active"}
+            className="p-2 rounded-full hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)] disabled:opacity-40"
+            title="Video call"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => startCall("audio")}
+            disabled={callJoining || callState === "active"}
+            className="p-2 rounded-full hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)] disabled:opacity-40"
+            title="Voice call"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.07 21 3 13.93 3 5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.01l-2.2 2.2z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInfoOpen(true)}
+            className="p-2 rounded-full hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)]"
+            title="Group info"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       <MessageList
@@ -562,6 +705,26 @@ export function Chat() {
           messageCount={chatInfo.messageCount}
           onLeave={chatInfo.type === "GROUP" ? handleLeaveGroup : undefined}
           onDirectChat={chatInfo.type === "GROUP" ? handleDirectChat : undefined}
+        />
+      )}
+
+      {callState === "active" && callToken && livekitUrl && (
+        <CallOverlay
+          token={callToken}
+          serverUrl={livekitUrl}
+          callType={callType}
+          title={session.title}
+          onLeave={endCall}
+        />
+      )}
+
+      {callState === "incoming" && incomingCall && (
+        <IncomingCallModal
+          call={incomingCall}
+          chatTitle={session.title}
+          onAccept={acceptIncomingCall}
+          onDecline={declineIncomingCall}
+          loading={callJoining}
         />
       )}
     </>

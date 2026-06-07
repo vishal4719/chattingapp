@@ -63,6 +63,18 @@ export function getMaxUploadBytes(): number {
   return parsed;
 }
 
+export function getLiveKitApiKey(): string {
+  return required("LIVEKIT_API_KEY");
+}
+
+export function getLiveKitApiSecret(): string {
+  return required("LIVEKIT_API_SECRET");
+}
+
+export function getLiveKitUrl(): string {
+  return required("LIVEKIT_URL").replace(/\/$/, "");
+}
+
 export function getApiPublicUrl(): string {
   const explicit = optional("API_PUBLIC_URL");
   if (explicit) {
