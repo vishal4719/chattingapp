@@ -14,11 +14,19 @@
   --wa-input: #2a3942;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
 body {
   background: var(--wa-bg);
   color: var(--wa-text);
-  min-height: 100vh;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  overscroll-behavior: none;
 }
 
 .wa-chat-bg {

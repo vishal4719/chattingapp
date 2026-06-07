@@ -14,6 +14,7 @@ interface Props {
   typingNames?: string[];
   conversationId: string;
   participantToken: string;
+  className?: string;
 }
 
 export function MessageList({
@@ -23,15 +24,22 @@ export function MessageList({
   typingNames = [],
   conversationId,
   participantToken,
+  className = "",
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   }, [items, typingNames.length]);
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto wa-scrollbar wa-chat-bg px-[6%] py-3 space-y-0.5">
+    <div
+      ref={scrollRef}
+      className={`flex-1 min-h-0 overflow-y-auto wa-scrollbar wa-chat-bg px-[6%] py-3 max-md:pt-[72px] space-y-0.5 ${className}`}
+    >
       {items.length === 0 && (
         <div className="flex items-center justify-center h-full">
           <div className="bg-[#182229]/90 text-[var(--wa-text-secondary)] text-sm px-4 py-2 rounded-lg shadow">
