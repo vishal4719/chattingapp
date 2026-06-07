@@ -90,6 +90,10 @@ export function Chat() {
   const callEndedRef = useRef(false);
   const callActiveRef = useRef(false);
   const callStartedAtRef = useRef<number | null>(null);
+  const finishCallWithSummaryRef = useRef<
+    (summary: CallLeaveSummary, endedByRemote?: boolean) => void
+  >(() => undefined);
+  const resetCallStateRef = useRef<() => void>(() => undefined);
   const socketRef = useRef<Socket | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
 
@@ -162,6 +166,9 @@ export function Chat() {
     [callType, conversationId, session?.type]
   );
 
+  finishCallWithSummaryRef.current = finishCallWithSummary;
+  resetCallStateRef.current = resetCallState;
+
   const markRead = useCallback(
     async (convId: string, participantToken: string) => {
       if (socketRef.current?.connected) {
@@ -197,7 +204,7 @@ export function Chat() {
     setConnected(false);
     setTypingUsers(new Map());
     setLoading(true);
-    resetCallState();
+    resetCallStateRef.current();
 
     const stored = getParticipantSession(conversationId);
     if (!stored) {
@@ -378,7 +385,7 @@ export function Chat() {
           ) {
             return;
           }
-          resetCallState();
+          resetCallStateRef.current();
           clearParticipantSession(conversationId!);
           setClosed(true);
           socket.disconnect();
@@ -412,7 +419,7 @@ export function Chat() {
           (payload: { conversationId: string; endedBy: string }) => {
             if (payload.conversationId !== conversationId) return;
             if (callActiveRef.current && callStartedAtRef.current) {
-              finishCallWithSummary(
+              finishCallWithSummaryRef.current(
                 {
                   participantNames: [...callParticipantsRef.current],
                   durationSeconds: Math.max(
@@ -423,7 +430,7 @@ export function Chat() {
                 true
               );
             } else {
-              resetCallState();
+              resetCallStateRef.current();
             }
           }
         );
@@ -444,7 +451,7 @@ export function Chat() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered, resetCallState, finishCallWithSummary]);
+  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered]);
 
   // Poll only when WebSocket is disconnected (e.g. serverless fallback)
   useEffect(() => {
