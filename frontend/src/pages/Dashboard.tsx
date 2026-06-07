@@ -46,6 +46,23 @@ export function Dashboard() {
   useEffect(() => {
     loadConversations();
     loadAdminProfile();
+
+    const refresh = () => {
+      loadConversations();
+    };
+
+    window.addEventListener("chat:dashboard-refresh", refresh);
+    window.addEventListener("chat:sidebar-refresh", refresh);
+    window.addEventListener("focus", refresh);
+
+    const interval = window.setInterval(refresh, 5000);
+
+    return () => {
+      window.removeEventListener("chat:dashboard-refresh", refresh);
+      window.removeEventListener("chat:sidebar-refresh", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(interval);
+    };
   }, []);
 
   async function handleCreate(type: "GROUP" | "DIRECT") {

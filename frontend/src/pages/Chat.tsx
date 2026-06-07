@@ -6,6 +6,7 @@ import {
   ChatItem,
   ChatMessage,
   JoinNotification,
+  CallEventNotification,
 } from "../lib/api";
 import { createChatSocket, setupRoomJoin } from "../lib/socket";
 import {
@@ -23,16 +24,18 @@ import {
   getParticipantSession,
   saveParticipantSession,
 } from "../lib/storage";
-import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus, mergePolledTimeline, removeMessageById } from "../lib/timeline";
+import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus, mergePolledTimeline, removeMessageById, upsertCallEvent } from "../lib/timeline";
 import { getPollIntervalMs } from "../lib/env";
 import { ApiError } from "../lib/api";
 import { formatTypingText } from "../lib/typing";
+import { buildCallEventText, notifyAppRefresh, type CallLeaveSummary } from "../lib/callSummary";
 import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { Avatar } from "../components/Avatar";
 import { ChatInfoPanel } from "../components/ChatInfoPanel";
 import { CallOverlay } from "../components/CallOverlay";
 import { IncomingCallModal } from "../components/IncomingCallModal";
+import { CallSummaryModal } from "../components/CallSummaryModal";
 
 interface ChatLocationState {
   conversationId?: string;
@@ -81,6 +84,12 @@ export function Chat() {
     null
   );
   const [callJoining, setCallJoining] = useState(false);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [callSummary, setCallSummary] = useState<CallLeaveSummary | null>(null);
+  const callParticipantsRef = useRef<Set<string>>(new Set());
+  const callEndedRef = useRef(false);
+  const callActiveRef = useRef(false);
+  const callStartedAtRef = useRef<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
 
@@ -90,7 +99,68 @@ export function Chat() {
     setLivekitUrl(null);
     setIncomingCall(null);
     setCallJoining(false);
+    setCallStartedAt(null);
+    callParticipantsRef.current = new Set();
+    callEndedRef.current = false;
+    callActiveRef.current = false;
+    callStartedAtRef.current = null;
   }, []);
+
+  const finishCallWithSummary = useCallback(
+    (summary: CallLeaveSummary, endedByRemote = false) => {
+      if (callEndedRef.current) return;
+      callEndedRef.current = true;
+
+      const mergedNames = [
+        ...callParticipantsRef.current,
+        ...summary.participantNames,
+      ].filter(Boolean);
+      const uniqueNames = [...new Set(mergedNames)];
+      const finalSummary: CallLeaveSummary = {
+        durationSeconds: summary.durationSeconds,
+        participantNames:
+          uniqueNames.length > 0 ? uniqueNames : [...callParticipantsRef.current],
+      };
+
+      if (finalSummary.participantNames.length > 0 || finalSummary.durationSeconds > 0) {
+        const endedAt = new Date().toISOString();
+        const isGroupChat = session?.type === "GROUP";
+        const event: CallEventNotification = {
+          id: `call-${Date.now()}`,
+          type: "call",
+          callType,
+          durationSeconds: finalSummary.durationSeconds,
+          participantCount: finalSummary.participantNames.length || 1,
+          participantNames: finalSummary.participantNames,
+          endedAt,
+          text: buildCallEventText(
+            callType,
+            finalSummary.durationSeconds,
+            finalSummary.participantNames,
+            !!isGroupChat
+          ),
+        };
+        setItems((prev) => upsertCallEvent(prev, event));
+        setCallSummary(finalSummary);
+      }
+
+      if (!endedByRemote && conversationId && socketRef.current?.connected) {
+        emitCallEnd(socketRef.current, conversationId);
+      }
+
+      setCallState("idle");
+      setCallToken(null);
+      setLivekitUrl(null);
+      setIncomingCall(null);
+      setCallJoining(false);
+      setCallStartedAt(null);
+      callParticipantsRef.current = new Set();
+      callActiveRef.current = false;
+      callStartedAtRef.current = null;
+      notifyAppRefresh();
+    },
+    [callType, conversationId, session?.type]
+  );
 
   const markRead = useCallback(
     async (convId: string, participantToken: string) => {
@@ -102,6 +172,7 @@ export function Chat() {
           .catch(() => undefined);
       }
       window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+      notifyAppRefresh();
     },
     []
   );
@@ -166,6 +237,7 @@ export function Chat() {
           .markConversationRead(conversationId!, stored!.sessionToken)
           .catch(() => undefined);
         window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+      notifyAppRefresh();
 
         const socket = createChatSocket({
           participantToken: stored!.sessionToken,
@@ -194,6 +266,7 @@ export function Chat() {
               return next;
             });
             setItems((prev) => upsertMessage(prev, msg));
+            notifyAppRefresh();
 
             if (msg.participant.id !== stored!.participantId) {
               markDelivered(conversationId!, msg.id);
@@ -274,6 +347,8 @@ export function Chat() {
 
             setItems((prev) => upsertJoinEvent(prev, notification));
 
+            notifyAppRefresh();
+
             setChatInfo((prev) => {
               if (!prev || prev.id !== conversationId) return prev;
               if (prev.participants.some((p) => p.id === participant.id)) {
@@ -322,10 +397,34 @@ export function Chat() {
         });
 
         socket.on(
+          "call:accepted",
+          (payload: {
+            conversationId: string;
+            participantName: string;
+          }) => {
+            if (payload.conversationId !== conversationId) return;
+            callParticipantsRef.current.add(payload.participantName);
+          }
+        );
+
+        socket.on(
           "call:ended",
           (payload: { conversationId: string; endedBy: string }) => {
             if (payload.conversationId !== conversationId) return;
-            resetCallState();
+            if (callActiveRef.current && callStartedAtRef.current) {
+              finishCallWithSummary(
+                {
+                  participantNames: [...callParticipantsRef.current],
+                  durationSeconds: Math.max(
+                    1,
+                    Math.floor((Date.now() - callStartedAtRef.current) / 1000)
+                  ),
+                },
+                true
+              );
+            } else {
+              resetCallState();
+            }
           }
         );
       } catch (err) {
@@ -345,7 +444,7 @@ export function Chat() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered, resetCallState]);
+  }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered, resetCallState, finishCallWithSummary]);
 
   // Poll only when WebSocket is disconnected (e.g. serverless fallback)
   useEffect(() => {
@@ -430,6 +529,7 @@ export function Chat() {
       );
 
       setItems((prev) => upsertMessage(prev, { ...message, pending: false }));
+      notifyAppRefresh();
     } catch {
       setItems((prev) => removeMessageById(prev, optimisticId));
     }
@@ -484,6 +584,7 @@ export function Chat() {
     );
 
     setItems((prev) => upsertMessage(prev, message));
+    notifyAppRefresh();
   }
 
   async function startCall(type: CallType) {
@@ -502,6 +603,11 @@ export function Chat() {
       if (socketRef.current?.connected) {
         emitCallStart(socketRef.current, conversationId, type);
       }
+      const startedAt = Date.now();
+      callParticipantsRef.current = new Set([session.displayName]);
+      callActiveRef.current = true;
+      callStartedAtRef.current = startedAt;
+      setCallStartedAt(startedAt);
       setCallState("active");
       setIncomingCall(null);
     } catch (err) {
@@ -532,6 +638,14 @@ export function Chat() {
           incomingCall.callType
         );
       }
+      const startedAt = Date.now();
+      callParticipantsRef.current = new Set([
+        session.displayName,
+        incomingCall.callerName,
+      ]);
+      callActiveRef.current = true;
+      callStartedAtRef.current = startedAt;
+      setCallStartedAt(startedAt);
       setIncomingCall(null);
       setCallState("active");
     } catch (err) {
@@ -552,11 +666,8 @@ export function Chat() {
     resetCallState();
   }
 
-  function endCall() {
-    if (conversationId && socketRef.current?.connected) {
-      emitCallEnd(socketRef.current, conversationId);
-    }
-    resetCallState();
+  function handleCallLeave(summary: CallLeaveSummary) {
+    finishCallWithSummary(summary);
   }
 
   if (loading) {
@@ -609,8 +720,8 @@ export function Chat() {
         : "syncing…";
 
   return (
-    <>
-      <header className="h-[60px] px-2 md:px-4 flex items-center gap-2 bg-[var(--wa-header)] shrink-0 border-b border-[var(--wa-border)]">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <header className="sticky top-0 z-30 h-[60px] px-2 md:px-4 flex items-center gap-2 bg-[var(--wa-header)] shrink-0 border-b border-[var(--wa-border)]">
         <Link
           to="/dashboard"
           className="md:hidden p-2 text-[var(--wa-text-secondary)]"
@@ -708,13 +819,25 @@ export function Chat() {
         />
       )}
 
-      {callState === "active" && callToken && livekitUrl && (
+      {callState === "active" && callToken && livekitUrl && callStartedAt && (
         <CallOverlay
           token={callToken}
           serverUrl={livekitUrl}
           callType={callType}
           title={session.title}
-          onLeave={endCall}
+          startedAt={callStartedAt}
+          onLeave={handleCallLeave}
+        />
+      )}
+
+      {callSummary && (
+        <CallSummaryModal
+          callType={callType}
+          durationSeconds={callSummary.durationSeconds}
+          participantNames={callSummary.participantNames}
+          isGroup={isGroup}
+          chatTitle={session.title}
+          onClose={() => setCallSummary(null)}
         />
       )}
 
@@ -727,6 +850,6 @@ export function Chat() {
           loading={callJoining}
         />
       )}
-    </>
+    </div>
   );
 }

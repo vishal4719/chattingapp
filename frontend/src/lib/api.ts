@@ -62,10 +62,25 @@ export interface JoinNotification {
   joinedAt: string;
 }
 
-export type ChatItem = ChatMessage | JoinNotification;
+export interface CallEventNotification {
+  id: string;
+  type: "call";
+  callType: "video" | "audio";
+  durationSeconds: number;
+  participantCount: number;
+  participantNames: string[];
+  endedAt: string;
+  text: string;
+}
+
+export type ChatItem = ChatMessage | JoinNotification | CallEventNotification;
 
 export function isJoinNotification(item: ChatItem): item is JoinNotification {
   return "type" in item && item.type === "join";
+}
+
+export function isCallNotification(item: ChatItem): item is CallEventNotification {
+  return "type" in item && item.type === "call";
 }
 
 export interface User {

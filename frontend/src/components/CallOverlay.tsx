@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   LiveKitRoom,
   ParticipantTile,
@@ -8,6 +9,8 @@ import {
 import { Track } from "livekit-client";
 import "@livekit/components-styles";
 import type { CallType } from "../lib/calls";
+import type { CallLeaveSummary } from "../lib/callSummary";
+import { formatCallDuration } from "../lib/callSummary";
 import { CallControls } from "./CallControls";
 import { Avatar } from "./Avatar";
 
@@ -16,7 +19,8 @@ interface Props {
   serverUrl: string;
   callType: CallType;
   title: string;
-  onLeave: () => void;
+  startedAt: number;
+  onLeave: (summary: CallLeaveSummary) => void;
 }
 
 function CallGrid({ audioOnly }: { audioOnly: boolean }) {
@@ -55,13 +59,91 @@ function CallGrid({ audioOnly }: { audioOnly: boolean }) {
   );
 }
 
+function CallRoomContent({
+  callType,
+  title,
+  startedAt,
+  onLeave,
+}: {
+  callType: CallType;
+  title: string;
+  startedAt: number;
+  onLeave: (summary: CallLeaveSummary) => void;
+}) {
+  const participants = useParticipants();
+  const leftRef = useRef(false);
+  const namesRef = useRef<string[]>([]);
+  const [elapsed, setElapsed] = useState(0);
+
+  namesRef.current = participants.map((p) => p.name || p.identity);
+
+  useEffect(() => {
+    const tick = () =>
+      setElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+
+  function finishCall() {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    const durationSeconds = Math.max(
+      1,
+      Math.floor((Date.now() - startedAt) / 1000)
+    );
+    onLeave({
+      participantNames: namesRef.current,
+      durationSeconds,
+    });
+  }
+
+  return (
+    <>
+      <header className="h-[60px] px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] shrink-0">
+        <div>
+          <p className="text-[17px] font-normal">{title}</p>
+          <p className="text-xs text-[var(--wa-green)]">
+            {callType === "video" ? "Video call" : "Voice call"} ·{" "}
+            {formatCallDuration(elapsed)} · {participants.length} in call
+          </p>
+        </div>
+      </header>
+
+      <CallGrid audioOnly={callType === "audio"} />
+      <RoomAudioRenderer />
+      <CallControls callType={callType} onLeave={finishCall} />
+    </>
+  );
+}
+
 export function CallOverlay({
   token,
   serverUrl,
   callType,
   title,
+  startedAt,
   onLeave,
 }: Props) {
+  const summaryRef = useRef(onLeave);
+  summaryRef.current = onLeave;
+  const startedAtRef = useRef(startedAt);
+  startedAtRef.current = startedAt;
+  const leftRef = useRef(false);
+
+  function handleDisconnected() {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    const durationSeconds = Math.max(
+      1,
+      Math.floor((Date.now() - startedAtRef.current) / 1000)
+    );
+    summaryRef.current({
+      participantNames: [],
+      durationSeconds,
+    });
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--wa-bg)]">
       <LiveKitRoom
@@ -70,21 +152,18 @@ export function CallOverlay({
         connect
         audio
         video={callType === "video"}
-        onDisconnected={onLeave}
+        onDisconnected={handleDisconnected}
         className="flex flex-col h-full"
       >
-        <header className="h-[60px] px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] shrink-0">
-          <div>
-            <p className="text-[17px] font-normal">{title}</p>
-            <p className="text-xs text-[var(--wa-green)]">
-              {callType === "video" ? "Video call" : "Voice call"}
-            </p>
-          </div>
-        </header>
-
-        <CallGrid audioOnly={callType === "audio"} />
-        <RoomAudioRenderer />
-        <CallControls callType={callType} onLeave={onLeave} />
+        <CallRoomContent
+          callType={callType}
+          title={title}
+          startedAt={startedAt}
+          onLeave={(summary) => {
+            leftRef.current = true;
+            summaryRef.current(summary);
+          }}
+        />
       </LiveKitRoom>
     </div>
   );

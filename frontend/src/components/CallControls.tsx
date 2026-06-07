@@ -31,8 +31,8 @@ export function CallControls({ callType, onLeave }: Props) {
   }
 
   async function handleEnd() {
-    await room.disconnect();
     onLeave();
+    await room.disconnect();
   }
 
   const btnClass =

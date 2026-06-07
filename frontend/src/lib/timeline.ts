@@ -1,41 +1,57 @@
-import type { ChatItem, ChatMessage, JoinNotification } from "./api";
-import { isJoinNotification } from "./api";
+import type {
+  CallEventNotification,
+  ChatItem,
+  ChatMessage,
+  JoinNotification,
+} from "./api";
+import { isCallNotification, isJoinNotification } from "./api";
+
+function itemTimestamp(item: ChatItem): string {
+  if (isJoinNotification(item)) return item.joinedAt;
+  if (isCallNotification(item)) return item.endedAt;
+  return item.createdAt;
+}
+
+function isSystemEvent(item: ChatItem): boolean {
+  return isJoinNotification(item) || isCallNotification(item);
+}
 
 export function buildTimeline(
   messages: ChatMessage[],
-  joinEvents: JoinNotification[]
+  joinEvents: JoinNotification[],
+  callEvents: CallEventNotification[] = []
 ): ChatItem[] {
-  const items: ChatItem[] = [...messages, ...joinEvents];
+  const items: ChatItem[] = [...messages, ...joinEvents, ...callEvents];
 
-  return items.sort((a, b) => {
-    const timeA = isJoinNotification(a) ? a.joinedAt : a.createdAt;
-    const timeB = isJoinNotification(b) ? b.joinedAt : b.createdAt;
-    return new Date(timeA).getTime() - new Date(timeB).getTime();
-  });
+  return items.sort(
+    (a, b) =>
+      new Date(itemTimestamp(a)).getTime() - new Date(itemTimestamp(b)).getTime()
+  );
 }
 
 export function isPendingMessage(item: ChatItem): boolean {
-  return !isJoinNotification(item) && item.id.startsWith("temp-");
+  return !isSystemEvent(item) && item.id.startsWith("temp-");
 }
 
 export function upsertMessage(items: ChatItem[], msg: ChatMessage): ChatItem[] {
   const existing = items.find(
-    (i) => !isJoinNotification(i) && i.id === msg.id
+    (i) => !isSystemEvent(i) && i.id === msg.id
   ) as ChatMessage | undefined;
 
   if (existing) {
     return items.map((i) =>
-      !isJoinNotification(i) && i.id === msg.id ? { ...i, ...msg, pending: false } : i
+      !isSystemEvent(i) && i.id === msg.id ? { ...i, ...msg, pending: false } : i
     );
   }
 
   const withoutMatchingPending = items.filter((i) => {
-    if (isJoinNotification(i)) return true;
+    if (isSystemEvent(i)) return true;
+    const pendingMsg = i as ChatMessage;
     if (
       !msg.pending &&
-      isPendingMessage(i) &&
-      i.content === msg.content &&
-      i.participant.id === msg.participant.id
+      isPendingMessage(pendingMsg) &&
+      pendingMsg.content === msg.content &&
+      pendingMsg.participant.id === msg.participant.id
     ) {
       return false;
     }
@@ -43,13 +59,14 @@ export function upsertMessage(items: ChatItem[], msg: ChatMessage): ChatItem[] {
   });
 
   return buildTimeline(
-    [...withoutMatchingPending.filter((i) => !isJoinNotification(i)), msg] as ChatMessage[],
-    withoutMatchingPending.filter(isJoinNotification) as JoinNotification[]
+    [...withoutMatchingPending.filter((i) => !isSystemEvent(i)), msg] as ChatMessage[],
+    withoutMatchingPending.filter(isJoinNotification) as JoinNotification[],
+    withoutMatchingPending.filter(isCallNotification) as CallEventNotification[]
   );
 }
 
 export function removeMessageById(items: ChatItem[], messageId: string): ChatItem[] {
-  return items.filter((i) => isJoinNotification(i) || i.id !== messageId);
+  return items.filter((i) => isSystemEvent(i) || i.id !== messageId);
 }
 
 export function mergePolledTimeline(
@@ -57,7 +74,8 @@ export function mergePolledTimeline(
   messages: ChatMessage[],
   joinEvents: JoinNotification[]
 ): ChatItem[] {
-  const serverTimeline = buildTimeline(messages, joinEvents);
+  const callEvents = current.filter(isCallNotification) as CallEventNotification[];
+  const serverTimeline = buildTimeline(messages, joinEvents, callEvents);
   const pending = current.filter(isPendingMessage) as ChatMessage[];
 
   if (pending.length === 0) {
@@ -65,13 +83,15 @@ export function mergePolledTimeline(
   }
 
   const stillPending = pending.filter((p) => {
-    const sent = serverTimeline.some(
-      (i) =>
-        !isJoinNotification(i) &&
-        i.participant.id === p.participant.id &&
-        i.content === p.content &&
-        Math.abs(new Date(i.createdAt).getTime() - new Date(p.createdAt).getTime()) < 60_000
-    );
+    const sent = serverTimeline.some((i) => {
+      if (isSystemEvent(i)) return false;
+      const serverMsg = i as ChatMessage;
+      return (
+        serverMsg.participant.id === p.participant.id &&
+        serverMsg.content === p.content &&
+        Math.abs(new Date(serverMsg.createdAt).getTime() - new Date(p.createdAt).getTime()) < 60_000
+      );
+    });
     return !sent;
   });
 
@@ -80,8 +100,9 @@ export function mergePolledTimeline(
   }
 
   return buildTimeline(
-    [...serverTimeline.filter((i) => !isJoinNotification(i)), ...stillPending] as ChatMessage[],
-    serverTimeline.filter(isJoinNotification) as JoinNotification[]
+    [...serverTimeline.filter((i) => !isSystemEvent(i)), ...stillPending] as ChatMessage[],
+    serverTimeline.filter(isJoinNotification) as JoinNotification[],
+    callEvents
   );
 }
 
@@ -91,7 +112,7 @@ export function updateMessageStatus(
   status: import("./api").MessageStatus
 ): ChatItem[] {
   return items.map((item) => {
-    if (isJoinNotification(item)) return item;
+    if (isSystemEvent(item)) return item;
     if (item.id === messageId) {
       return { ...item, status };
     }
@@ -105,7 +126,20 @@ export function upsertJoinEvent(
 ): ChatItem[] {
   if (items.some((i) => i.id === event.id)) return items;
   return buildTimeline(
-    items.filter((i) => !isJoinNotification(i)) as ChatMessage[],
-    [...items.filter(isJoinNotification), event] as JoinNotification[]
+    items.filter((i) => !isSystemEvent(i)) as ChatMessage[],
+    [...items.filter(isJoinNotification), event] as JoinNotification[],
+    items.filter(isCallNotification) as CallEventNotification[]
+  );
+}
+
+export function upsertCallEvent(
+  items: ChatItem[],
+  event: CallEventNotification
+): ChatItem[] {
+  if (items.some((i) => i.id === event.id)) return items;
+  return buildTimeline(
+    items.filter((i) => !isSystemEvent(i)) as ChatMessage[],
+    items.filter(isJoinNotification) as JoinNotification[],
+    [...items.filter(isCallNotification), event] as CallEventNotification[]
   );
 }

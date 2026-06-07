@@ -93,12 +93,14 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
 
     const onRefresh = () => load();
     window.addEventListener("chat:sidebar-refresh", onRefresh);
+    window.addEventListener("chat:dashboard-refresh", onRefresh);
     window.addEventListener("focus", onRefresh);
 
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(load, 5000);
 
     return () => {
       window.removeEventListener("chat:sidebar-refresh", onRefresh);
+      window.removeEventListener("chat:dashboard-refresh", onRefresh);
       window.removeEventListener("focus", onRefresh);
       clearInterval(interval);
     };

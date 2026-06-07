@@ -31,8 +31,17 @@ export async function createCallToken(params: {
     canPublishData: true,
     canPublishSources:
       params.callType === "audio"
-        ? [TrackSource.MICROPHONE]
-        : [TrackSource.MICROPHONE, TrackSource.CAMERA, TrackSource.SCREEN_SHARE],
+        ? [
+            TrackSource.MICROPHONE,
+            TrackSource.SCREEN_SHARE,
+            TrackSource.SCREEN_SHARE_AUDIO,
+          ]
+        : [
+            TrackSource.MICROPHONE,
+            TrackSource.CAMERA,
+            TrackSource.SCREEN_SHARE,
+            TrackSource.SCREEN_SHARE_AUDIO,
+          ],
   });
 
   return {

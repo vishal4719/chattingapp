@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatItem } from "../lib/api";
-import { isJoinNotification } from "../lib/api";
+import { isCallNotification, isJoinNotification } from "../lib/api";
 import { formatMessageTime, getAvatarColor } from "../lib/avatar";
 import { Avatar } from "./Avatar";
 import { TypingIndicator } from "./TypingIndicator";
@@ -31,7 +31,7 @@ export function MessageList({
   }, [items, typingNames.length]);
 
   return (
-    <div className="flex-1 overflow-y-auto wa-scrollbar wa-chat-bg px-[6%] py-3 space-y-0.5">
+    <div className="flex-1 min-h-0 overflow-y-auto wa-scrollbar wa-chat-bg px-[6%] py-3 space-y-0.5">
       {items.length === 0 && (
         <div className="flex items-center justify-center h-full">
           <div className="bg-[#182229]/90 text-[var(--wa-text-secondary)] text-sm px-4 py-2 rounded-lg shadow">
@@ -51,6 +51,16 @@ export function MessageList({
           );
         }
 
+        if (isCallNotification(item)) {
+          return (
+            <div key={item.id} className="flex justify-center my-3">
+              <span className="text-xs text-[var(--wa-text-secondary)] bg-[#182229]/80 px-3 py-1.5 rounded-lg shadow-sm text-center max-w-[90%]">
+                {item.text}
+              </span>
+            </div>
+          );
+        }
+
         const isOwn = item.participant.id === currentParticipantId;
         const prev = items[index - 1];
         const showAvatar =
@@ -58,7 +68,9 @@ export function MessageList({
           !isOwn &&
           (!prev ||
             isJoinNotification(prev) ||
+            isCallNotification(prev) ||
             (!isJoinNotification(prev) &&
+              !isCallNotification(prev) &&
               prev.participant.id !== item.participant.id));
 
         return (

@@ -13,11 +13,31 @@ const directSchema = z.object({
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+type MemberIdentity = { userId?: string; adminId?: string };
+
+function memberIdentity(participant: {
+  userId: string | null;
+  adminId: string | null;
+}): MemberIdentity | null {
+  if (participant.userId) return { userId: participant.userId };
+  if (participant.adminId) return { adminId: participant.adminId };
+  return null;
+}
+
+function identityMatches(
+  participant: { userId: string | null; adminId: string | null },
+  identity: MemberIdentity
+): boolean {
+  if (identity.userId && participant.userId === identity.userId) return true;
+  if (identity.adminId && participant.adminId === identity.adminId) return true;
+  return false;
+}
+
 async function findExistingDirectChat(
   workspaceAdminId: string | null,
   createdByAdminId: string,
-  userIdA: string,
-  userIdB: string
+  identityA: MemberIdentity,
+  identityB: MemberIdentity
 ) {
   const candidates = await prisma.conversation.findMany({
     where: {
@@ -25,27 +45,27 @@ async function findExistingDirectChat(
       destroyedAt: null,
       createdByAdminId,
       workspaceAdminId,
-      participants: {
-        some: { userId: userIdA, leftAt: null },
-      },
     },
     include: {
       participants: {
         where: { leftAt: null },
-        select: { id: true, userId: true, sessionToken: true, displayName: true },
+        select: {
+          id: true,
+          userId: true,
+          adminId: true,
+          sessionToken: true,
+          displayName: true,
+          phone: true,
+        },
       },
     },
   });
 
   return candidates.find((conv) => {
-    const userIds = conv.participants
-      .map((p) => p.userId)
-      .filter((id): id is string => !!id);
-    return (
-      userIds.length === 2 &&
-      userIds.includes(userIdA) &&
-      userIds.includes(userIdB)
-    );
+    if (conv.participants.length !== 2) return false;
+    const hasA = conv.participants.some((p) => identityMatches(p, identityA));
+    const hasB = conv.participants.some((p) => identityMatches(p, identityB));
+    return hasA && hasB;
   });
 }
 
@@ -64,8 +84,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return errorResponse("Unauthorized", 401);
   }
 
-  if (!participant.userId) {
-    return errorResponse("Sign in with a registered account to message privately", 403);
+  const myIdentity = memberIdentity(participant);
+  if (!myIdentity) {
+    return errorResponse(
+      "Sign in with a registered account to message privately",
+      403
+    );
   }
 
   const sourceConversation = participant.conversation;
@@ -100,27 +124,29 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return errorResponse("Cannot message yourself", 400);
     }
 
-    if (!target.userId) {
+    const targetIdentity = memberIdentity(target);
+    if (!targetIdentity) {
       return errorResponse("This member has not registered an account yet", 400);
     }
 
     const existing = await findExistingDirectChat(
       sourceConversation.workspaceAdminId,
       sourceConversation.createdByAdminId,
-      participant.userId,
-      target.userId
+      myIdentity,
+      targetIdentity
     );
 
     if (existing) {
-      let myParticipant = existing.participants.find(
-        (p) => p.userId === participant.userId
+      let myParticipant = existing.participants.find((p) =>
+        identityMatches(p, myIdentity)
       );
 
       if (!myParticipant) {
         myParticipant = await prisma.participant.create({
           data: {
             conversationId: existing.id,
-            userId: participant.userId,
+            userId: myIdentity.userId,
+            adminId: myIdentity.adminId,
             displayName: participant.displayName,
             phone: participant.phone,
             ipAddress: getClientIpFromHeaders(req.headers),
@@ -130,7 +156,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
       }
 
       const history = await getConversationHistory(existing.id, myParticipant.id);
-      const other = existing.participants.find((p) => p.userId === target.userId);
+      const other = existing.participants.find((p) =>
+        identityMatches(p, targetIdentity)
+      );
 
       return jsonResponse({
         conversationId: existing.id,
@@ -162,7 +190,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
       prisma.participant.create({
         data: {
           conversationId: directConversation.id,
-          userId: participant.userId,
+          userId: myIdentity.userId,
+          adminId: myIdentity.adminId,
           displayName: participant.displayName,
           phone: participant.phone,
           ipAddress,
@@ -172,7 +201,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
       prisma.participant.create({
         data: {
           conversationId: directConversation.id,
-          userId: target.userId,
+          userId: targetIdentity.userId,
+          adminId: targetIdentity.adminId,
           displayName: target.displayName,
           phone: target.phone,
           ipAddress: "direct",
