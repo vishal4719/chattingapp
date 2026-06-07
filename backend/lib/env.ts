@@ -75,6 +75,18 @@ export function getLiveKitUrl(): string {
   return required("LIVEKIT_URL").replace(/\/$/, "");
 }
 
+export function getVapidPublicKey(): string | undefined {
+  return optional("VAPID_PUBLIC_KEY");
+}
+
+export function getVapidPrivateKey(): string | undefined {
+  return optional("VAPID_PRIVATE_KEY");
+}
+
+export function getVapidSubject(): string | undefined {
+  return optional("VAPID_SUBJECT");
+}
+
 export function getApiPublicUrl(): string {
   const explicit = optional("API_PUBLIC_URL");
   if (explicit) {

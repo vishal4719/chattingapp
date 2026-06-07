@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { UserProtectedRoute } from "./components/UserProtectedRoute";
 import { WhatsAppLayout } from "./components/WhatsAppLayout";
+import { NotificationsBootstrap } from "./components/NotificationsBootstrap";
 import { Login } from "./pages/Login";
 import { UserRegister } from "./pages/UserRegister";
 import { Dashboard } from "./pages/Dashboard";
@@ -11,7 +12,9 @@ import { ChatRoute } from "./pages/ChatRoute";
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <NotificationsBootstrap />
+      <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/user-login" element={<Navigate to="/login" replace />} />
@@ -27,5 +30,6 @@ export default function App() {
         <Route path="/admin-dashboard" element={<Dashboard />} />
       </Route>
     </Routes>
+    </>
   );
 }

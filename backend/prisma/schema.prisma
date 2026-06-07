@@ -32,6 +32,7 @@ model User {
   passwordHash String
   createdAt    DateTime      @default(now())
   participants Participant[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Admin {
@@ -49,8 +50,26 @@ model Admin {
   createdAt        DateTime       @default(now())
   conversations    Conversation[]
   participants     Participant[]
+  pushSubscriptions PushSubscription[]
 
   @@index([workspaceAdminId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminId   String?
+  admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([adminId])
 }
 
 model Conversation {

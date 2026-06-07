@@ -14,6 +14,7 @@ import {
   formatMessagePayload,
 } from "@/lib/s3";
 import { emitNewMessage } from "@/lib/socket";
+import { notifyConversationMessage } from "@/lib/push";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
 
 const messageSchema = z.object({
@@ -155,6 +156,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
       const payload = await formatMessagePayload(message);
       payload.status = "SENT";
       emitNewMessage(conversationId, payload);
+      void notifyConversationMessage(conversationId, participant.id, {
+        content: payload.content,
+        type: payload.type ?? "TEXT",
+        fileName: payload.fileName,
+        participant: payload.participant,
+      });
       return jsonResponse({ message: payload });
     }
 
@@ -189,6 +196,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
     ]);
 
     emitNewMessage(conversationId, payload);
+    void notifyConversationMessage(conversationId, participant.id, {
+      content: payload.content,
+      type: payload.type ?? "TEXT",
+      fileName: payload.fileName,
+      participant: payload.participant,
+    });
     return jsonResponse({ message: payload });
   } catch {
     return errorResponse("Failed to send message", 500);

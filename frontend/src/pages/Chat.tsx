@@ -29,6 +29,7 @@ import { getPollIntervalMs } from "../lib/env";
 import { ApiError } from "../lib/api";
 import { formatTypingText } from "../lib/typing";
 import { buildCallEventText, notifyAppRefresh, type CallLeaveSummary } from "../lib/callSummary";
+import { showLocalNotification } from "../lib/notifications";
 import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { Avatar } from "../components/Avatar";
@@ -278,6 +279,18 @@ export function Chat() {
             if (msg.participant.id !== stored!.participantId) {
               markDelivered(conversationId!, msg.id);
               markRead(conversationId!, stored!.sessionToken);
+
+              if (document.hidden) {
+                const preview =
+                  msg.preview ||
+                  (msg.type && msg.type !== "TEXT" ? "Sent an attachment" : msg.content);
+                showLocalNotification(
+                  stored!.title,
+                  `${msg.participant.displayName}: ${preview}`,
+                  `/chat/${conversationId}`,
+                  conversationId
+                );
+              }
             }
           }
         );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, syncUserConversations } from "../lib/api";
 import { formatChatTime } from "../lib/avatar";
@@ -9,6 +9,7 @@ import {
   getAllParticipantSessions,
   getUserProfile,
 } from "../lib/storage";
+import { showLocalNotification } from "../lib/notifications";
 import { Avatar } from "./Avatar";
 import { formatLastMessagePreview } from "./AttachmentBubble";
 
@@ -33,6 +34,8 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
   const navigate = useNavigate();
   const [chats, setChats] = useState<SidebarChat[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastMessageAtRef = useRef<Map<string, string>>(new Map());
+  const initializedRef = useRef(false);
   const isAdmin = localStorage.getItem("adminToken") !== null;
   const adminUser = JSON.parse(localStorage.getItem("adminUser") ?? "{}");
   const userProfile = getUserProfile();
@@ -68,6 +71,32 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
             isGroup: info.type === "GROUP",
             unreadCount: info.unreadCount ?? 0,
           });
+
+          const messageAt = info.lastMessage?.createdAt;
+          const prevAt = lastMessageAtRef.current.get(session.conversationId);
+          const isActiveChat = conversationId === session.conversationId;
+
+          if (
+            initializedRef.current &&
+            messageAt &&
+            prevAt &&
+            messageAt !== prevAt &&
+            !isActiveChat &&
+            info.lastMessage &&
+            (info.unreadCount ?? 0) > 0
+          ) {
+            const preview = formatLastMessagePreview(info.lastMessage);
+            showLocalNotification(
+              info.title,
+              preview,
+              `/chat/${session.conversationId}`,
+              session.conversationId
+            );
+          }
+
+          if (messageAt) {
+            lastMessageAtRef.current.set(session.conversationId, messageAt);
+          }
         } catch (err) {
           if (
             err instanceof ApiError &&
@@ -87,6 +116,7 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
       setChats(open);
       onChatsLoaded?.(open);
       setLoading(false);
+      initializedRef.current = true;
     }
 
     load();
@@ -104,7 +134,7 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
       window.removeEventListener("focus", onRefresh);
       clearInterval(interval);
     };
-  }, [location.pathname, onChatsLoaded]);
+  }, [location.pathname, conversationId, onChatsLoaded]);
 
   const profileName = isAdmin
     ? (adminUser.name ?? "Admin")

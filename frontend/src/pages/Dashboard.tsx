@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, Conversation, ConversationDetail } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { AdminSettings } from "../components/AdminSettings";
+import { NotificationBanner } from "../components/NotificationBanner";
 import { saveParticipantSession } from "../lib/storage";
 
 export function Dashboard() {
@@ -161,7 +162,8 @@ export function Dashboard() {
   const openChats = conversations.filter((c) => !c.destroyedAt);
 
   return (
-    <div className="min-h-screen bg-[var(--wa-bg)]">
+    <div className="min-h-screen bg-[var(--wa-bg)] flex flex-col">
+      <NotificationBanner />
       <header className="h-[60px] px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Avatar name={adminUser.name ?? "Admin"} size="sm" />

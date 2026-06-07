@@ -382,6 +382,18 @@ export const api = {
       { method: "POST", body: JSON.stringify({ callType }) },
       participantToken
     ),
+
+  getPushConfig: () =>
+    request<{ enabled: boolean; publicKey: string | null }>("/api/push/vapid-key"),
+
+  registerPushSubscription: (subscription: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  }) =>
+    request<{ ok: boolean }>("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(subscription),
+    }),
 };
 
 export async function syncUserConversations(): Promise<void> {
