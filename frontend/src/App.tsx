@@ -3,6 +3,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { UserProtectedRoute } from "./components/UserProtectedRoute";
 import { WhatsAppLayout } from "./components/WhatsAppLayout";
 import { NotificationsBootstrap } from "./components/NotificationsBootstrap";
+import { SeoManager } from "./components/SeoManager";
 import { Login } from "./pages/Login";
 import { UserRegister } from "./pages/UserRegister";
 import { Dashboard } from "./pages/Dashboard";
@@ -14,6 +15,7 @@ export default function App() {
   return (
     <>
       <NotificationsBootstrap />
+      <SeoManager />
       <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />

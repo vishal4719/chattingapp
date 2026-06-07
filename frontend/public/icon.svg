@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
-  <rect width="128" height="128" rx="28" fill="#00a884"/>
-  <path fill="#fff" d="M32 36c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12v36c0 6.6-5.4 12-12 12H56l-20 16v-16H44c-6.6 0-12-5.4-12-12V36z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="ChatApp logo">
+  <rect width="512" height="512" rx="112" fill="#FFFFFF"/>
+  <circle cx="318" cy="242" r="86" fill="#E5EAF0"/>
+  <path fill="#E5EAF0" d="M356 312c18 8 34 22 46 40l44 44v-52h-90z"/>
+  <circle cx="214" cy="258" r="96" fill="#1A91FF"/>
+  <path fill="#1A91FF" d="M142 346c-8 18-12 38-12 58v48l-38-38c14-22 32-40 54-54l-4-14z"/>
+  <circle cx="182" cy="258" r="14" fill="#FFFFFF"/>
+  <circle cx="214" cy="258" r="14" fill="#FFFFFF"/>
+  <circle cx="246" cy="258" r="14" fill="#FFFFFF"/>
 </svg>

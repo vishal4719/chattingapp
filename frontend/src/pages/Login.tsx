@@ -7,6 +7,7 @@ import {
   saveUserSession,
 } from "../lib/storage";
 import { PasswordInput } from "../components/PasswordInput";
+import { AppLogo } from "../components/AppLogo";
 
 export function Login() {
   const navigate = useNavigate();
@@ -55,12 +56,8 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-[var(--wa-bg)]">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--wa-green)] mb-4">
-            <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
-              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-light text-[var(--wa-text)]">Sign in</h1>
+          <AppLogo size={88} className="mx-auto mb-4" />
+          <h1 className="text-2xl font-light text-[var(--wa-text)]">Sign in to ChatApp</h1>
           <p className="text-[var(--wa-text-secondary)] text-sm mt-2">
             Users go to chats · Admins go to the dashboard
           </p>
