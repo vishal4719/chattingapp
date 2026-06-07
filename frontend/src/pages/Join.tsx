@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api } from "../lib/api";
-import { saveParticipantSession } from "../lib/storage";
+import { api, syncUserConversations } from "../lib/api";
+import { getUserToken, saveParticipantSession } from "../lib/storage";
 import { Avatar } from "../components/Avatar";
 
 export function Join() {
@@ -13,9 +13,8 @@ export function Join() {
     title: string;
     inviteToken: string;
     destroyed: boolean;
+    alreadyJoined?: boolean;
   } | null>(null);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
@@ -23,22 +22,28 @@ export function Join() {
   useEffect(() => {
     if (!token) return;
 
+    if (!getUserToken()) {
+      navigate(`/user-login?redirect=${encodeURIComponent(`/join/${token}`)}`, {
+        replace: true,
+      });
+      return;
+    }
+
     api
       .getJoinInfo(token)
       .then(setInfo)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, navigate]);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleJoin() {
     if (!token) return;
 
     setJoining(true);
     setError("");
 
     try {
-      const result = await api.joinConversation(token, name.trim(), phone.trim());
+      const result = await api.joinConversation(token);
       saveParticipantSession(result.conversationId, {
         sessionToken: result.sessionToken,
         participantId: result.participantId,
@@ -46,6 +51,7 @@ export function Join() {
         title: result.title,
         type: result.type,
       });
+      await syncUserConversations();
       navigate(`/chat/${result.conversationId}`, {
         state: {
           conversationId: result.conversationId,
@@ -58,6 +64,11 @@ export function Join() {
     } finally {
       setJoining(false);
     }
+  }
+
+  function handleOpenChat() {
+    if (!info) return;
+    navigate(`/chat/${info.id}`);
   }
 
   if (loading) {
@@ -106,40 +117,12 @@ export function Join() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <p className="text-sm text-[var(--wa-text-secondary)] text-center mb-2">
-            Enter your details to join the conversation
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-[var(--wa-text-secondary)] text-center">
+            {info?.alreadyJoined
+              ? "You are already a member of this group."
+              : "You have been invited to join this conversation."}
           </p>
-
-          <div>
-            <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
-              Your name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={50}
-              placeholder="Display name"
-              className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
-              Phone number
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              minLength={5}
-              maxLength={20}
-              placeholder="+91 98765 43210"
-              className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
-            />
-          </div>
 
           {error && (
             <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">
@@ -147,14 +130,32 @@ export function Join() {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={joining}
-            className="w-full py-2.5 rounded-lg bg-[var(--wa-green)] hover:bg-[#06cf9c] disabled:opacity-50 transition font-medium text-white"
+          {info?.alreadyJoined ? (
+            <button
+              type="button"
+              onClick={handleOpenChat}
+              className="w-full py-2.5 rounded-lg bg-[var(--wa-green)] hover:bg-[#06cf9c] transition font-medium text-white"
+            >
+              Open chat
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleJoin}
+              disabled={joining}
+              className="w-full py-2.5 rounded-lg bg-[var(--wa-green)] hover:bg-[#06cf9c] disabled:opacity-50 transition font-medium text-white"
+            >
+              {joining ? "Joining..." : "Join group"}
+            </button>
+          )}
+
+          <Link
+            to="/dashboard"
+            className="block text-center text-sm text-[var(--wa-text-secondary)] hover:text-[var(--wa-green)]"
           >
-            {joining ? "Joining..." : "Join group"}
-          </button>
-        </form>
+            Back to chats
+          </Link>
+        </div>
       </div>
     </div>
   );

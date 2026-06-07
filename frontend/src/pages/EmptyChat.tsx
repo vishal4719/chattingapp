@@ -14,7 +14,7 @@ export function EmptyChat() {
         <p className="text-[var(--wa-text-secondary)] text-sm leading-relaxed">
           Send and receive messages without keeping your phone connected.
           <br />
-          Select a chat from the sidebar to start messaging.
+          Select a chat from the sidebar, or open an invite link to join a group.
         </p>
         <p className="text-[var(--wa-text-secondary)] text-xs mt-6 flex items-center justify-center gap-1">
           <svg viewBox="0 0 10 12" width="10" fill="currentColor">

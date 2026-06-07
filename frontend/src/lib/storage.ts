@@ -73,3 +73,34 @@ export function clearAllParticipantSessions(): void {
   );
   keys.forEach((k) => localStorage.removeItem(k));
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export function saveUserSession(token: string, user: UserProfile): void {
+  localStorage.setItem("userToken", token);
+  localStorage.setItem("userProfile", JSON.stringify(user));
+}
+
+export function getUserToken(): string | null {
+  return localStorage.getItem("userToken");
+}
+
+export function getUserProfile(): UserProfile | null {
+  const raw = localStorage.getItem("userProfile");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
+export function clearUserSession(): void {
+  localStorage.removeItem("userToken");
+  localStorage.removeItem("userProfile");
+}

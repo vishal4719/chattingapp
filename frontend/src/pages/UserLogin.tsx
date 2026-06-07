@@ -1,11 +1,15 @@
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { api, syncUserConversations } from "../lib/api";
+import { saveUserSession } from "../lib/storage";
 
-export function Login() {
+export function UserLogin() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("admin@example.com");
-  const [password, setPassword] = useState("admin123");
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/dashboard";
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -15,10 +19,10 @@ export function Login() {
     setLoading(true);
 
     try {
-      const { token, admin } = await api.login(email, password);
-      localStorage.setItem("adminToken", token);
-      localStorage.setItem("adminUser", JSON.stringify(admin));
-      navigate("/admin-dashboard");
+      const { token, user } = await api.userLogin(email, password);
+      saveUserSession(token, user);
+      await syncUserConversations();
+      navigate(redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -32,12 +36,12 @@ export function Login() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--wa-green)] mb-4">
             <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-light text-[var(--wa-text)]">Admin Login</h1>
+          <h1 className="text-2xl font-light text-[var(--wa-text)]">Welcome back</h1>
           <p className="text-[var(--wa-text-secondary)] text-sm mt-2">
-            Sign in to manage groups and chats
+            Sign in to view your chats
           </p>
         </div>
 
@@ -54,6 +58,7 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
             />
           </div>
@@ -66,6 +71,7 @@ export function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
             />
           </div>
@@ -85,8 +91,17 @@ export function Login() {
           </button>
 
           <p className="text-center text-sm text-[var(--wa-text-secondary)]">
-            <Link to="/user-login" className="text-[var(--wa-green)] hover:underline">
-              User login
+            No account?{" "}
+            <Link
+              to={`/register${redirect !== "/dashboard" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
+              className="text-[var(--wa-green)] hover:underline"
+            >
+              Create account
+            </Link>
+          </p>
+          <p className="text-center text-xs text-[var(--wa-text-secondary)]">
+            <Link to="/login" className="hover:underline">
+              Admin login
             </Link>
           </p>
         </form>

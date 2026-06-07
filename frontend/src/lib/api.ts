@@ -1,4 +1,5 @@
 import { getApiUrl } from "./env";
+import { saveParticipantSession } from "./storage";
 
 const API_URL = getApiUrl();
 
@@ -67,6 +68,13 @@ export function isJoinNotification(item: ChatItem): item is JoinNotification {
   return "type" in item && item.type === "join";
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
 class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -85,8 +93,10 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   };
 
-  const token = localStorage.getItem("adminToken");
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const adminToken = localStorage.getItem("adminToken");
+  const userToken = localStorage.getItem("userToken");
+  if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+  else if (userToken) headers.Authorization = `Bearer ${userToken}`;
   if (participantToken) headers["X-Participant-Token"] = participantToken;
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
@@ -193,9 +203,10 @@ export const api = {
       title: string;
       inviteToken: string;
       destroyed: boolean;
+      alreadyJoined?: boolean;
     }>(`/api/join/${token}`),
 
-  joinConversation: (token: string, name: string, phone: string) =>
+  joinConversation: (token: string) =>
     request<{
       conversationId: string;
       sessionToken: string;
@@ -205,10 +216,41 @@ export const api = {
       title: string;
       messages: ChatMessage[];
       joinEvents: JoinNotification[];
-    }>(`/api/join/${token}`, {
+      rejoined?: boolean;
+    }>(`/api/join/${token}`, { method: "POST" }),
+
+  userRegister: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+  }) =>
+    request<{ token: string; user: User }>("/api/auth/user/register", {
       method: "POST",
-      body: JSON.stringify({ name, phone }),
+      body: JSON.stringify(data),
     }),
+
+  userLogin: (email: string, password: string) =>
+    request<{ token: string; user: User }>("/api/auth/user/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  getUserMe: () => request<{ user: User }>("/api/auth/user/me"),
+
+  getUserConversations: () =>
+    request<{
+      conversations: Array<{
+        conversationId: string;
+        sessionToken: string;
+        participantId: string;
+        displayName: string;
+        title: string;
+        type: string;
+        lastMessage: { preview: string; createdAt: string } | null;
+        unreadCount: number;
+      }>;
+    }>("/api/user/conversations"),
 
   getMessages: (conversationId: string, participantToken: string) =>
     request<{ messages: ChatMessage[]; joinEvents: JoinNotification[] }>(
@@ -278,5 +320,21 @@ export const api = {
     );
   },
 };
+
+export async function syncUserConversations(): Promise<void> {
+  const userToken = localStorage.getItem("userToken");
+  if (!userToken) return;
+
+  const { conversations } = await api.getUserConversations();
+  for (const c of conversations) {
+    saveParticipantSession(c.conversationId, {
+      sessionToken: c.sessionToken,
+      participantId: c.participantId,
+      displayName: c.displayName,
+      title: c.title,
+      type: c.type,
+    });
+  }
+}
 
 export { ApiError };

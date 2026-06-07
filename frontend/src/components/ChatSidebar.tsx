@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
-import { api, ApiError } from "../lib/api";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { api, ApiError, syncUserConversations } from "../lib/api";
 import { formatChatTime } from "../lib/avatar";
 import {
+  clearAllParticipantSessions,
   clearParticipantSession,
+  clearUserSession,
   getAllParticipantSessions,
+  getUserProfile,
 } from "../lib/storage";
 import { Avatar } from "./Avatar";
 import { formatLastMessagePreview } from "./AttachmentBubble";
@@ -27,13 +30,23 @@ interface Props {
 export function ChatSidebar({ onChatsLoaded }: Props) {
   const { conversationId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [chats, setChats] = useState<SidebarChat[]>([]);
   const [loading, setLoading] = useState(true);
   const isAdmin = localStorage.getItem("adminToken") !== null;
   const adminUser = JSON.parse(localStorage.getItem("adminUser") ?? "{}");
+  const userProfile = getUserProfile();
 
   useEffect(() => {
     async function load() {
+      if (localStorage.getItem("userToken")) {
+        try {
+          await syncUserConversations();
+        } catch {
+          // Keep cached sessions if sync fails
+        }
+      }
+
       const sessions = getAllParticipantSessions();
       const open: SidebarChat[] = [];
 
@@ -93,7 +106,13 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
 
   const profileName = isAdmin
     ? (adminUser.name ?? "Admin")
-    : chats[0]?.displayName ?? "Guest";
+    : (userProfile?.name ?? chats[0]?.displayName ?? "User");
+
+  function handleLogout() {
+    clearUserSession();
+    clearAllParticipantSessions();
+    navigate("/user-login");
+  }
 
   return (
     <aside className="flex flex-col h-full bg-[var(--wa-panel)] border-r border-[var(--wa-border)] w-full md:w-[420px] shrink-0">
@@ -102,16 +121,29 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
           <Avatar name={profileName} size="sm" />
           <div className="min-w-0">
             <p className="font-medium truncate text-[15px]">
-              {isAdmin ? adminUser.name ?? "Admin" : "Chats"}
+              {isAdmin ? adminUser.name ?? "Admin" : userProfile?.name ?? "Chats"}
             </p>
-            {isAdmin && (
+            {(isAdmin || userProfile) && (
               <p className="text-xs text-[var(--wa-text-secondary)] truncate">
-                {adminUser.email}
+                {isAdmin ? adminUser.email : userProfile?.email}
               </p>
             )}
           </div>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-1">
+          {!isAdmin && userProfile && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Logout"
+              className="p-2 rounded-full hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)]"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+              </svg>
+            </button>
+          )}
+          {isAdmin && (
           <Link
             to="/admin-dashboard"
             title="Admin settings"
@@ -121,7 +153,8 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
               <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-6C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
             </svg>
           </Link>
-        )}
+          )}
+        </div>
       </header>
 
       <div className="px-3 py-2 bg-[var(--wa-panel)]">

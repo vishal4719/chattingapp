@@ -1,24 +1,46 @@
 import { NextRequest } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
 import { getClientIpFromHeaders } from "@/lib/ip";
 import { generateSessionToken } from "@/lib/tokens";
 import { getConversationHistory } from "@/lib/history";
 import { emitParticipantJoined } from "@/lib/socket";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
 
-const joinSchema = z.object({
-  name: z.string().min(1).max(50),
-  phone: z.string().min(5).max(20),
-});
-
 type RouteContext = { params: Promise<{ token: string }> };
+
+async function buildJoinResponse(
+  conversation: {
+    id: string;
+    type: string;
+    title: string;
+  },
+  participant: { id: string; sessionToken: string; displayName: string },
+  rejoined: boolean
+) {
+  const history = await getConversationHistory(conversation.id, participant.id);
+  const joinEvents = history.joinEvents.filter(
+    (e) => e.id !== `join-${participant.id}`
+  );
+
+  return {
+    conversationId: conversation.id,
+    sessionToken: participant.sessionToken,
+    participantId: participant.id,
+    displayName: participant.displayName,
+    type: conversation.type,
+    title: conversation.title,
+    messages: history.messages,
+    joinEvents,
+    rejoined,
+  };
+}
 
 export async function OPTIONS() {
   return optionsResponse();
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
 
   const conversation = await prisma.conversation.findUnique({
@@ -29,17 +51,44 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     return errorResponse("Invalid invite link", 404);
   }
 
+  const auth = requireUser(req);
+  let alreadyJoined = false;
+
+  if (auth) {
+    const existing = await prisma.participant.findFirst({
+      where: {
+        conversationId: conversation.id,
+        userId: auth.userId,
+      },
+    });
+    alreadyJoined = !!existing;
+  }
+
   return jsonResponse({
     id: conversation.id,
     type: conversation.type,
     title: conversation.title,
     inviteToken: conversation.inviteToken,
     destroyed: !!conversation.destroyedAt,
+    alreadyJoined,
   });
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
+  const auth = requireUser(req);
+
+  if (!auth) {
+    return errorResponse("Sign in to join this group", 401);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+  });
+
+  if (!user) {
+    return errorResponse("User not found", 404);
+  }
 
   const conversation = await prisma.conversation.findUnique({
     where: { inviteToken: token },
@@ -54,11 +103,20 @@ export async function POST(req: NextRequest, context: RouteContext) {
   }
 
   try {
-    const body = await req.json();
-    const parsed = joinSchema.safeParse(body);
+    const existing = await prisma.participant.findFirst({
+      where: {
+        conversationId: conversation.id,
+        userId: user.id,
+      },
+    });
 
-    if (!parsed.success) {
-      return errorResponse("Name and phone are required", 400);
+    if (existing) {
+      const payload = await buildJoinResponse(
+        conversation,
+        existing,
+        true
+      );
+      return jsonResponse(payload);
     }
 
     const ipAddress = getClientIpFromHeaders(req.headers);
@@ -67,35 +125,25 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const participant = await prisma.participant.create({
       data: {
         conversationId: conversation.id,
-        displayName: parsed.data.name,
-        phone: parsed.data.phone,
+        userId: user.id,
+        displayName: user.name,
+        phone: user.phone,
         ipAddress,
         sessionToken,
       },
     });
-
-    const history = await getConversationHistory(conversation.id, participant.id);
-
-    // Exclude the new joiner's own join event — others see it live via socket
-    const joinEvents = history.joinEvents.filter(
-      (e) => e.id !== `join-${participant.id}`
-    );
 
     emitParticipantJoined(conversation.id, {
       id: participant.id,
       displayName: participant.displayName,
     });
 
-    return jsonResponse({
-      conversationId: conversation.id,
-      sessionToken: participant.sessionToken,
-      participantId: participant.id,
-      displayName: participant.displayName,
-      type: conversation.type,
-      title: conversation.title,
-      messages: history.messages,
-      joinEvents,
-    });
+    const payload = await buildJoinResponse(
+      conversation,
+      participant,
+      false
+    );
+    return jsonResponse(payload);
   } catch {
     return errorResponse("Failed to join conversation", 500);
   }

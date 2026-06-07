@@ -1,11 +1,17 @@
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { saveUserSession } from "../lib/storage";
 
-export function Login() {
+export function UserRegister() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("admin@example.com");
-  const [password, setPassword] = useState("admin123");
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/dashboard";
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -15,12 +21,16 @@ export function Login() {
     setLoading(true);
 
     try {
-      const { token, admin } = await api.login(email, password);
-      localStorage.setItem("adminToken", token);
-      localStorage.setItem("adminUser", JSON.stringify(admin));
-      navigate("/admin-dashboard");
+      const { token, user } = await api.userRegister({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+      });
+      saveUserSession(token, user);
+      navigate(redirect);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -32,12 +42,12 @@ export function Login() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--wa-green)] mb-4">
             <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-light text-[var(--wa-text)]">Admin Login</h1>
+          <h1 className="text-2xl font-light text-[var(--wa-text)]">Create account</h1>
           <p className="text-[var(--wa-text-secondary)] text-sm mt-2">
-            Sign in to manage groups and chats
+            Sign up to join groups and chat
           </p>
         </div>
 
@@ -47,6 +57,20 @@ export function Login() {
         >
           <div>
             <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
+              Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              maxLength={50}
+              autoComplete="name"
+              className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
               Email
             </label>
             <input
@@ -54,6 +78,23 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
+              className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
+              Phone number
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              minLength={5}
+              maxLength={20}
+              autoComplete="tel"
+              placeholder="+91 98765 43210"
               className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
             />
           </div>
@@ -66,6 +107,8 @@ export function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
+              autoComplete="new-password"
               className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
             />
           </div>
@@ -81,12 +124,16 @@ export function Login() {
             disabled={loading}
             className="w-full py-2.5 rounded-lg bg-[var(--wa-green)] hover:bg-[#06cf9c] disabled:opacity-50 transition font-medium text-white"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Creating account..." : "Create account"}
           </button>
 
           <p className="text-center text-sm text-[var(--wa-text-secondary)]">
-            <Link to="/user-login" className="text-[var(--wa-green)] hover:underline">
-              User login
+            Already have an account?{" "}
+            <Link
+              to={`/user-login${redirect !== "/dashboard" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
+              className="text-[var(--wa-green)] hover:underline"
+            >
+              Sign in
             </Link>
           </p>
         </form>
