@@ -106,7 +106,9 @@ export function MessageList({
                 <span className="text-[11px] text-[var(--wa-text-secondary)]">
                   {formatMessageTime(item.createdAt)}
                 </span>
-                {isOwn && <MessageStatusTicks status={item.status} />}
+                {isOwn && (
+                  <MessageStatusTicks status={item.status} pending={item.pending} />
+                )}
               </div>
             </div>
           </div>

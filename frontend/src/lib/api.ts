@@ -44,6 +44,7 @@ export interface ChatMessage {
   content: string;
   type?: MessageType;
   status?: MessageStatus;
+  pending?: boolean;
   createdAt: string;
   fileName?: string | null;
   mimeType?: string | null;

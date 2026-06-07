@@ -2,11 +2,34 @@ import type { MessageStatus } from "../lib/api";
 
 interface Props {
   status?: MessageStatus;
+  pending?: boolean;
 }
 
-export function MessageStatusTicks({ status = "SENT" }: Props) {
+export function MessageStatusTicks({ status = "SENT", pending }: Props) {
   const color =
     status === "READ" ? "#53bdeb" : "rgba(255,255,255,0.6)";
+
+  if (pending) {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        width="14"
+        height="14"
+        className="inline-block ml-1 -mt-0.5 shrink-0 opacity-60"
+        aria-label="Sending"
+      >
+        <circle
+          cx="8"
+          cy="8"
+          r="6"
+          fill="none"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeDasharray="20 10"
+        />
+      </svg>
+    );
+  }
 
   if (status === "SENT") {
     return (

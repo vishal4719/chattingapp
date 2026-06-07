@@ -113,9 +113,14 @@ export function MessageInput({
         clearSelectedFile();
       } else {
         const trimmed = content.trim();
-        if (!trimmed) return;
-        await onSend(trimmed);
+        if (!trimmed) {
+          setSending(false);
+          return;
+        }
         setContent("");
+        setSending(false);
+        void onSend(trimmed);
+        return;
       }
     } finally {
       setSending(false);

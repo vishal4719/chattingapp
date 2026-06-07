@@ -12,7 +12,7 @@ import {
   clearParticipantSession,
   getParticipantSession,
 } from "../lib/storage";
-import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus } from "../lib/timeline";
+import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus, mergePolledTimeline, removeMessageById } from "../lib/timeline";
 import { getPollIntervalMs } from "../lib/env";
 import { ApiError } from "../lib/api";
 import { formatTypingText } from "../lib/typing";
@@ -300,9 +300,9 @@ export function Chat() {
     };
   }, [conversationId, navigate, isAdmin, location.state, markRead, markDelivered]);
 
-  // Poll for new messages when WebSocket is unavailable (e.g. Vercel serverless hosting)
+  // Poll only when WebSocket is disconnected (e.g. serverless fallback)
   useEffect(() => {
-    if (!conversationId || !session || loading || closed || error) return;
+    if (!conversationId || !session || loading || closed || error || connected) return;
 
     let cancelled = false;
 
@@ -314,7 +314,9 @@ export function Chat() {
         );
         if (cancelled) return;
 
-        setItems(buildTimeline(history.messages, history.joinEvents));
+        setItems((prev) =>
+          mergePolledTimeline(prev, history.messages, history.joinEvents)
+        );
 
         if (!socketRef.current?.connected) {
           await api
@@ -340,7 +342,7 @@ export function Chat() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [conversationId, session, loading, closed, error]);
+  }, [conversationId, session, loading, closed, error, connected]);
 
   const emitTypingStart = useCallback(() => {
     if (!conversationId || !socketRef.current?.connected) return;
@@ -357,13 +359,33 @@ export function Chat() {
 
     emitTypingStop();
 
-    const { message } = await api.sendMessage(
-      conversationId,
+    const optimisticId = `temp-${crypto.randomUUID()}`;
+    const optimistic: ChatMessage = {
+      id: optimisticId,
       content,
-      session.sessionToken
-    );
+      type: "TEXT",
+      status: "SENT",
+      pending: true,
+      createdAt: new Date().toISOString(),
+      participant: {
+        id: session.participantId,
+        displayName: session.displayName,
+      },
+    };
 
-    setItems((prev) => upsertMessage(prev, message));
+    setItems((prev) => upsertMessage(prev, optimistic));
+
+    try {
+      const { message } = await api.sendMessage(
+        conversationId,
+        content,
+        session.sessionToken
+      );
+
+      setItems((prev) => upsertMessage(prev, { ...message, pending: false }));
+    } catch {
+      setItems((prev) => removeMessageById(prev, optimisticId));
+    }
   }
 
   async function handleSendAttachment(file: File, caption: string) {

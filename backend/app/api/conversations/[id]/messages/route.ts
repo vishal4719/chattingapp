@@ -6,12 +6,12 @@ import { getClientIpFromHeaders } from "@/lib/ip";
 import { getConversationHistory } from "@/lib/history";
 import {
   createReceiptsForMessage,
-  formatMessageForViewer,
 } from "@/lib/receipts";
 import {
   inferMessageType,
   resolveMimeType,
   uploadChatFile,
+  formatMessagePayload,
 } from "@/lib/s3";
 import { emitNewMessage } from "@/lib/socket";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
@@ -152,7 +152,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
         participant.id
       );
 
-      const payload = await formatMessageForViewer(message, participant.id);
+      const payload = await formatMessagePayload(message);
+      payload.status = "SENT";
       emitNewMessage(conversationId, payload);
       return jsonResponse({ message: payload });
     }
@@ -179,13 +180,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
       },
     });
 
-    await createReceiptsForMessage(
-      message.id,
-      conversationId,
-      participant.id
-    );
+    const [payload] = await Promise.all([
+      formatMessagePayload(message).then((formatted) => {
+        formatted.status = "SENT";
+        return formatted;
+      }),
+      createReceiptsForMessage(message.id, conversationId, participant.id),
+    ]);
 
-    const payload = await formatMessageForViewer(message, participant.id);
     emitNewMessage(conversationId, payload);
     return jsonResponse({ message: payload });
   } catch {
