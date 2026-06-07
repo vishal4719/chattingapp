@@ -130,7 +130,7 @@ export function UserRegister() {
           <p className="text-center text-sm text-[var(--wa-text-secondary)]">
             Already have an account?{" "}
             <Link
-              to={`/user-login${redirect !== "/dashboard" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
+              to={`/login${redirect !== "/dashboard" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
               className="text-[var(--wa-green)] hover:underline"
             >
               Sign in

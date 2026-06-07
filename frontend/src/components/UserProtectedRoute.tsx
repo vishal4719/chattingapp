@@ -5,7 +5,7 @@ export function UserProtectedRoute() {
   const adminToken = localStorage.getItem("adminToken");
 
   if (!userToken && !adminToken) {
-    return <Navigate to="/user-login" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return <Outlet />;

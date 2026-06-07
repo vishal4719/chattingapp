@@ -111,7 +111,7 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
   function handleLogout() {
     clearUserSession();
     clearAllParticipantSessions();
-    navigate("/user-login");
+    navigate("/login");
   }
 
   return (

@@ -3,7 +3,6 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { UserProtectedRoute } from "./components/UserProtectedRoute";
 import { WhatsAppLayout } from "./components/WhatsAppLayout";
 import { Login } from "./pages/Login";
-import { UserLogin } from "./pages/UserLogin";
 import { UserRegister } from "./pages/UserRegister";
 import { Dashboard } from "./pages/Dashboard";
 import { EmptyChat } from "./pages/EmptyChat";
@@ -15,7 +14,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/user-login" element={<UserLogin />} />
+      <Route path="/user-login" element={<Navigate to="/login" replace />} />
       <Route path="/register" element={<UserRegister />} />
       <Route path="/join/:token" element={<Join />} />
       <Route element={<UserProtectedRoute />}>

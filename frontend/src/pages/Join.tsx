@@ -23,7 +23,7 @@ export function Join() {
     if (!token) return;
 
     if (!getUserToken()) {
-      navigate(`/user-login?redirect=${encodeURIComponent(`/join/${token}`)}`, {
+      navigate(`/login?redirect=${encodeURIComponent(`/join/${token}`)}`, {
         replace: true,
       });
       return;
