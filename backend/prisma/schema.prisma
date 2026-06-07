@@ -84,6 +84,7 @@ model Participant {
   ipAddress      String
   sessionToken   String           @unique
   joinedAt       DateTime         @default(now())
+  leftAt         DateTime?
   lastReadAt     DateTime?
   messages       Message[]
   messageReceipts MessageReceipt[]

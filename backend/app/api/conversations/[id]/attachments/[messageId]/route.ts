@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   }
 
   const participant = await prisma.participant.findFirst({
-    where: { sessionToken, conversationId },
+    where: { sessionToken, conversationId, leftAt: null },
   });
 
   if (!participant) {

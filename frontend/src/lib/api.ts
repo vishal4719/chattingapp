@@ -319,6 +319,37 @@ export const api = {
       participantToken
     );
   },
+
+  leaveConversation: (conversationId: string, participantToken: string) =>
+    request<{ success: boolean; conversationId: string }>(
+      `/api/conversations/${conversationId}/leave`,
+      { method: "POST" },
+      participantToken
+    ),
+
+  startDirectChat: (
+    conversationId: string,
+    targetParticipantId: string,
+    participantToken: string
+  ) =>
+    request<{
+      conversationId: string;
+      sessionToken: string;
+      participantId: string;
+      displayName: string;
+      title: string;
+      type: string;
+      messages: ChatMessage[];
+      joinEvents: JoinNotification[];
+      rejoined?: boolean;
+    }>(
+      `/api/conversations/${conversationId}/direct`,
+      {
+        method: "POST",
+        body: JSON.stringify({ targetParticipantId }),
+      },
+      participantToken
+    ),
 };
 
 export async function syncUserConversations(): Promise<void> {

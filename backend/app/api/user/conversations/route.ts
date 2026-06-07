@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   const participants = await prisma.participant.findMany({
-    where: { userId: auth.userId },
+    where: { userId: auth.userId, leftAt: null },
     include: {
       conversation: {
         select: {

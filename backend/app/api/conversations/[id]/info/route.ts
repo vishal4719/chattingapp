@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getParticipantToken } from "@/lib/auth";
+import { getActiveParticipant } from "@/lib/participant-auth";
 import { formatLastMessagePreview, formatMessagePayload } from "@/lib/s3";
 import { getUnreadCount } from "@/lib/receipts";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
@@ -13,15 +13,7 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest, context: RouteContext) {
   const { id: conversationId } = await context.params;
-  const sessionToken = getParticipantToken(req);
-
-  if (!sessionToken) {
-    return errorResponse("Unauthorized", 401);
-  }
-
-  const participant = await prisma.participant.findFirst({
-    where: { sessionToken, conversationId },
-  });
+  const participant = await getActiveParticipant(req, conversationId);
 
   if (!participant) {
     return errorResponse("Unauthorized", 401);
@@ -31,6 +23,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     where: { id: conversationId },
     include: {
       participants: {
+        where: { leftAt: null },
         orderBy: { joinedAt: "asc" },
         select: {
           id: true,

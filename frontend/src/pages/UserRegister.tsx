@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { saveUserSession } from "../lib/storage";
+import { PasswordInput } from "../components/PasswordInput";
 
 export function UserRegister() {
   const navigate = useNavigate();
@@ -102,14 +103,12 @@ export function UserRegister() {
             <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
               Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               required
               minLength={6}
               autoComplete="new-password"
-              className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
             />
           </div>
 

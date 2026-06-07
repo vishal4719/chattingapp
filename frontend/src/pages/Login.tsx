@@ -6,6 +6,7 @@ import {
   clearUserSession,
   saveUserSession,
 } from "../lib/storage";
+import { PasswordInput } from "../components/PasswordInput";
 
 export function Login() {
   const navigate = useNavigate();
@@ -86,13 +87,11 @@ export function Login() {
             <label className="block text-xs text-[var(--wa-green)] mb-1 uppercase">
               Password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               required
               autoComplete="current-password"
-              className="w-full rounded-lg bg-[var(--wa-input)] px-4 py-2.5 text-[var(--wa-text)] focus:outline-none focus:ring-1 focus:ring-[var(--wa-green)]"
             />
           </div>
 

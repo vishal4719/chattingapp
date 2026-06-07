@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getParticipantToken } from "@/lib/auth";
+import { getActiveParticipant } from "@/lib/participant-auth";
 import { getClientIpFromHeaders } from "@/lib/ip";
 import { getConversationHistory } from "@/lib/history";
 import {
@@ -30,11 +30,11 @@ async function getAuthenticatedParticipant(
   req: NextRequest,
   conversationId: string
 ) {
-  const sessionToken = getParticipantToken(req);
-  if (!sessionToken) return null;
+  const participant = await getActiveParticipant(req, conversationId);
+  if (!participant) return null;
 
   return prisma.participant.findFirst({
-    where: { sessionToken, conversationId },
+    where: { id: participant.id },
     include: {
       conversation: { select: { title: true } },
     },

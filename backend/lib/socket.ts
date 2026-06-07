@@ -56,6 +56,7 @@ export function initSocket(server: HTTPServer): SocketIOServer {
           where: {
             sessionToken: participantToken,
             conversationId,
+            leftAt: null,
           },
         });
 

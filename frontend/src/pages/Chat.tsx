@@ -11,6 +11,7 @@ import { createChatSocket, setupRoomJoin } from "../lib/socket";
 import {
   clearParticipantSession,
   getParticipantSession,
+  saveParticipantSession,
 } from "../lib/storage";
 import { buildTimeline, upsertJoinEvent, upsertMessage, updateMessageStatus, mergePolledTimeline, removeMessageById } from "../lib/timeline";
 import { getPollIntervalMs } from "../lib/env";
@@ -388,6 +389,42 @@ export function Chat() {
     }
   }
 
+  async function handleLeaveGroup() {
+    if (!conversationId || !session) return;
+
+    await api.leaveConversation(conversationId, session.sessionToken);
+    clearParticipantSession(conversationId);
+    window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+    navigate("/dashboard");
+  }
+
+  async function handleDirectChat(targetParticipantId: string) {
+    if (!conversationId || !session) return;
+
+    const result = await api.startDirectChat(
+      conversationId,
+      targetParticipantId,
+      session.sessionToken
+    );
+
+    saveParticipantSession(result.conversationId, {
+      sessionToken: result.sessionToken,
+      participantId: result.participantId,
+      displayName: result.displayName,
+      title: result.title,
+      type: result.type,
+    });
+
+    window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
+    navigate(`/chat/${result.conversationId}`, {
+      state: {
+        conversationId: result.conversationId,
+        messages: result.messages,
+        joinEvents: result.joinEvents,
+      },
+    });
+  }
+
   async function handleSendAttachment(file: File, caption: string) {
     if (!conversationId || !session) return;
 
@@ -523,6 +560,8 @@ export function Chat() {
           you={chatInfo.you}
           createdAt={chatInfo.createdAt}
           messageCount={chatInfo.messageCount}
+          onLeave={chatInfo.type === "GROUP" ? handleLeaveGroup : undefined}
+          onDirectChat={chatInfo.type === "GROUP" ? handleDirectChat : undefined}
         />
       )}
     </>
