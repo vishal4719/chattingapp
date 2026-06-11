@@ -554,7 +554,7 @@ export function Chat() {
         id: session.participantId,
         displayName: session.displayName,
       },
-      replyTo: replyTarget,
+      replyTo: replyTarget ?? undefined,
     };
 
     setItems((prev) => upsertMessage(prev, optimistic));
