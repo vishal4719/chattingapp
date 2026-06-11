@@ -80,6 +80,7 @@ export function Dashboard() {
       await api.createConversation(type, title.trim());
       setTitle("");
       await loadConversations();
+      window.dispatchEvent(new CustomEvent("chat:sidebar-refresh"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create");
     } finally {
@@ -162,9 +163,9 @@ export function Dashboard() {
   const openChats = conversations.filter((c) => !c.destroyedAt);
 
   return (
-    <div className="min-h-screen bg-[var(--wa-bg)] flex flex-col">
+    <div className="h-dvh max-h-dvh flex flex-col overflow-hidden bg-[var(--wa-bg)]">
       <NotificationBanner />
-      <header className="h-[60px] px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] sticky top-0 z-10">
+      <header className="h-[60px] shrink-0 px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] z-10">
         <div className="flex items-center gap-3">
           <Avatar name={adminUser.name ?? "Admin"} size="sm" />
           <div>
@@ -191,7 +192,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <main className="flex-1 min-h-0 overflow-y-auto wa-scrollbar max-w-3xl w-full mx-auto px-4 py-6 pb-8 space-y-4">
         <section className="rounded-lg bg-[var(--wa-panel)] border border-[var(--wa-border)] p-4">
           <h2 className="text-sm text-[var(--wa-green)] uppercase mb-3">
             New group

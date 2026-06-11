@@ -183,6 +183,20 @@ export const api = {
 
   getConversations: () => request<Conversation[]>("/api/admin/conversations"),
 
+  getAdminChats: () =>
+    request<{
+      conversations: Array<{
+        conversationId: string;
+        sessionToken: string;
+        participantId: string;
+        displayName: string;
+        title: string;
+        type: string;
+        lastMessage: { preview: string; createdAt: string } | null;
+        unreadCount: number;
+      }>;
+    }>("/api/admin/chats"),
+
   getConversation: (id: string) =>
     request<ConversationDetail>(`/api/admin/conversations/${id}`),
 
@@ -410,6 +424,35 @@ export async function syncUserConversations(): Promise<void> {
       type: c.type,
     });
   }
+}
+
+export async function syncAdminConversations(): Promise<
+  Array<{
+    conversationId: string;
+    sessionToken: string;
+    participantId: string;
+    displayName: string;
+    title: string;
+    type: string;
+    lastMessage: { preview: string; createdAt: string } | null;
+    unreadCount: number;
+  }>
+> {
+  const adminToken = localStorage.getItem("adminToken");
+  if (!adminToken) return [];
+
+  const { conversations } = await api.getAdminChats();
+  for (const c of conversations) {
+    saveParticipantSession(c.conversationId, {
+      sessionToken: c.sessionToken,
+      participantId: c.participantId,
+      displayName: c.displayName,
+      title: c.title,
+      type: c.type,
+      isAdmin: true,
+    });
+  }
+  return conversations;
 }
 
 export { ApiError };

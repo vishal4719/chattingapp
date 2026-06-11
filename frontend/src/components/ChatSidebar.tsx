@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, syncUserConversations } from "../lib/api";
+import type { Socket } from "socket.io-client";
+import {
+  api,
+  ApiError,
+  ChatMessage,
+  syncAdminConversations,
+  syncUserConversations,
+} from "../lib/api";
 import { formatChatTime } from "../lib/avatar";
 import {
   clearAllParticipantSessions,
   clearParticipantSession,
   clearUserSession,
   getAllParticipantSessions,
+  getParticipantSession,
   getUserProfile,
 } from "../lib/storage";
+import { createChatSocket, joinInboxRooms } from "../lib/socket";
 import { showLocalNotification } from "../lib/notifications";
 import { Avatar } from "./Avatar";
 import { formatLastMessagePreview } from "./AttachmentBubble";
@@ -28,6 +37,21 @@ interface Props {
   onChatsLoaded?: (chats: SidebarChat[]) => void;
 }
 
+function sortChats(chats: SidebarChat[]): SidebarChat[] {
+  return [...chats].sort((a, b) => {
+    const tA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+    const tB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+    return tB - tA;
+  });
+}
+
+function previewFromMessage(msg: ChatMessage): string {
+  return (
+    msg.preview ??
+    (msg.type && msg.type !== "TEXT" ? "Sent an attachment" : msg.content)
+  );
+}
+
 export function ChatSidebar({ onChatsLoaded }: Props) {
   const { conversationId } = useParams();
   const location = useLocation();
@@ -36,12 +60,154 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
   const [loading, setLoading] = useState(true);
   const lastMessageAtRef = useRef<Map<string, string>>(new Map());
   const initializedRef = useRef(false);
+  const conversationIdRef = useRef(conversationId);
+  const socketRef = useRef<Socket | null>(null);
+  const loadRef = useRef<(() => void) | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
   const adminUser = JSON.parse(localStorage.getItem("adminUser") ?? "{}");
   const userProfile = getUserProfile();
 
+  conversationIdRef.current = conversationId;
+
+  useEffect(() => {
+    if (!conversationId) return;
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.conversationId === conversationId
+          ? { ...chat, unreadCount: 0 }
+          : chat
+      )
+    );
+  }, [conversationId]);
+
+  useEffect(() => {
+    const adminJwt = isAdmin
+      ? (localStorage.getItem("adminToken") ?? undefined)
+      : undefined;
+    const userJwt = !isAdmin
+      ? (localStorage.getItem("userToken") ?? undefined)
+      : undefined;
+
+    if (!adminJwt && !userJwt) return;
+
+    const socket = createChatSocket({ adminJwt, userJwt });
+    socketRef.current = socket;
+    joinInboxRooms(socket);
+
+    socket.on(
+      "message:new",
+      (msg: ChatMessage & { conversationId?: string }) => {
+        const convId = msg.conversationId;
+        if (!convId) return;
+
+        const session = getParticipantSession(convId);
+        const fromSelf = session
+          ? msg.participant.id === session.participantId
+          : false;
+        const isActive = conversationIdRef.current === convId;
+        const preview = previewFromMessage(msg);
+
+        setChats((prev) => {
+          const existing = prev.find((c) => c.conversationId === convId);
+          if (!existing) {
+            loadRef.current?.();
+            return prev;
+          }
+
+          const updated = prev.map((chat) => {
+            if (chat.conversationId !== convId) return chat;
+            return {
+              ...chat,
+              lastMessage: preview,
+              lastMessageTime: msg.createdAt,
+              unreadCount:
+                isActive || fromSelf ? (isActive ? 0 : chat.unreadCount) : chat.unreadCount + 1,
+            };
+          });
+
+          return sortChats(updated);
+        });
+
+        const prevAt = lastMessageAtRef.current.get(convId);
+        if (
+          initializedRef.current &&
+          msg.createdAt !== prevAt &&
+          !isActive &&
+          !fromSelf
+        ) {
+          const title =
+            getParticipantSession(convId)?.title ?? "New message";
+          showLocalNotification(
+            title,
+            preview,
+            `/chat/${convId}`,
+            convId
+          );
+        }
+        lastMessageAtRef.current.set(convId, msg.createdAt);
+      }
+    );
+
+    return () => {
+      socket.removeAllListeners();
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [isAdmin]);
+
   useEffect(() => {
     async function load() {
+      if (isAdmin) {
+        try {
+          const conversations = await syncAdminConversations();
+          const open: SidebarChat[] = conversations.map((c) => ({
+            conversationId: c.conversationId,
+            title: c.title,
+            type: c.type,
+            displayName: c.displayName,
+            lastMessage: c.lastMessage?.preview,
+            lastMessageTime: c.lastMessage?.createdAt,
+            isGroup: c.type === "GROUP",
+            unreadCount: c.unreadCount,
+          }));
+
+          for (const chat of open) {
+            const messageAt = chat.lastMessageTime;
+            const prevAt = lastMessageAtRef.current.get(chat.conversationId);
+            const isActiveChat = conversationId === chat.conversationId;
+
+            if (
+              initializedRef.current &&
+              messageAt &&
+              prevAt &&
+              messageAt !== prevAt &&
+              !isActiveChat &&
+              chat.unreadCount > 0
+            ) {
+              showLocalNotification(
+                chat.title,
+                chat.lastMessage ?? "New message",
+                `/chat/${chat.conversationId}`,
+                chat.conversationId
+              );
+            }
+
+            if (messageAt) {
+              lastMessageAtRef.current.set(chat.conversationId, messageAt);
+            }
+          }
+
+          setChats(open);
+          onChatsLoaded?.(open);
+          setLoading(false);
+          initializedRef.current = true;
+          socketRef.current?.emit("join:inbox");
+        } catch {
+          setLoading(false);
+        }
+        return;
+      }
+
       if (localStorage.getItem("userToken")) {
         try {
           await syncUserConversations();
@@ -117,7 +283,12 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
       onChatsLoaded?.(open);
       setLoading(false);
       initializedRef.current = true;
+      socketRef.current?.emit("join:inbox");
     }
+
+    loadRef.current = () => {
+      void load();
+    };
 
     load();
 
@@ -126,7 +297,7 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
     window.addEventListener("chat:dashboard-refresh", onRefresh);
     window.addEventListener("focus", onRefresh);
 
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 30000);
 
     return () => {
       window.removeEventListener("chat:sidebar-refresh", onRefresh);
@@ -134,7 +305,7 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
       window.removeEventListener("focus", onRefresh);
       clearInterval(interval);
     };
-  }, [location.pathname, conversationId, onChatsLoaded]);
+  }, [location.pathname, conversationId, onChatsLoaded, isAdmin]);
 
   const profileName = isAdmin
     ? (adminUser.name ?? "Admin")

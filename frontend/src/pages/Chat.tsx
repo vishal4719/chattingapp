@@ -8,7 +8,7 @@ import {
   JoinNotification,
   CallEventNotification,
 } from "../lib/api";
-import { createChatSocket, setupRoomJoin } from "../lib/socket";
+import { createChatSocket, setupRoomJoin, sendTextMessageViaSocket } from "../lib/socket";
 import {
   type CallState,
   type CallType,
@@ -531,7 +531,6 @@ export function Chat() {
       content,
       type: "TEXT",
       status: "SENT",
-      pending: true,
       createdAt: new Date().toISOString(),
       participant: {
         id: session.participantId,
@@ -540,6 +539,17 @@ export function Chat() {
     };
 
     setItems((prev) => upsertMessage(prev, optimistic));
+
+    const socket = socketRef.current;
+    if (socket?.connected) {
+      try {
+        await sendTextMessageViaSocket(socket, conversationId, content);
+        notifyAppRefresh();
+      } catch {
+        setItems((prev) => removeMessageById(prev, optimisticId));
+      }
+      return;
+    }
 
     try {
       const { message } = await api.sendMessage(

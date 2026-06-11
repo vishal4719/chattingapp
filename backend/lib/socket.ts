@@ -1,7 +1,9 @@
 import { Server as SocketIOServer } from "socket.io";
 import type { Server as HTTPServer } from "http";
+import { z } from "zod";
 import { prisma } from "./prisma";
-import { verifyAdminToken } from "./auth";
+import { verifyAdminToken, verifyUserToken } from "./auth";
+import { getAdminById, getWorkspaceId } from "./admin-workspace";
 import type { MessagePayload } from "./s3";
 import { getFrontendUrl } from "./env";
 import {
@@ -9,6 +11,12 @@ import {
   markMessageDelivered,
   type MessageStatus,
 } from "./receipts";
+import { persistTextMessage } from "./send-message";
+
+const sendMessageSchema = z.object({
+  conversationId: z.string().min(1),
+  content: z.string().min(1).max(5000),
+});
 
 declare global {
   // eslint-disable-next-line no-var
@@ -34,10 +42,56 @@ export function initSocket(server: HTTPServer): SocketIOServer {
   global.__chatSocketIO = io;
 
   io.on("connection", (socket) => {
-    const { participantToken, adminJwt } = socket.handshake.auth as {
+    const { participantToken, adminJwt, userJwt } = socket.handshake.auth as {
       participantToken?: string;
       adminJwt?: string;
+      userJwt?: string;
     };
+
+    socket.on("join:inbox", async () => {
+      if (userJwt) {
+        const user = verifyUserToken(userJwt);
+        if (!user) return;
+
+        const participants = await prisma.participant.findMany({
+          where: {
+            userId: user.userId,
+            leftAt: null,
+            conversation: { destroyedAt: null },
+          },
+          select: { conversationId: true },
+        });
+
+        for (const p of participants) {
+          socket.join(`conv:${p.conversationId}`);
+        }
+        return;
+      }
+
+      if (adminJwt) {
+        const admin = verifyAdminToken(adminJwt);
+        if (!admin) return;
+
+        const adminRecord = await getAdminById(admin.adminId);
+        if (!adminRecord) return;
+
+        const workspaceId = getWorkspaceId(adminRecord);
+        const conversations = await prisma.conversation.findMany({
+          where: {
+            destroyedAt: null,
+            OR: [
+              { workspaceAdminId: workspaceId },
+              { workspaceAdminId: null, createdByAdminId: workspaceId },
+            ],
+          },
+          select: { id: true },
+        });
+
+        for (const c of conversations) {
+          socket.join(`conv:${c.id}`);
+        }
+      }
+    });
 
     socket.on("join:conversation", async (conversationId: string) => {
       if (!conversationId) return;
@@ -118,6 +172,48 @@ export function initSocket(server: HTTPServer): SocketIOServer {
         isTyping: false,
       });
     });
+
+    socket.on(
+      "message:send",
+      async (
+        data: { conversationId: string; content: string },
+        ack?: (response: { message?: MessagePayload; error?: string }) => void
+      ) => {
+        const participantId = socket.data.participantId as string | undefined;
+        const joinedConv = socket.data.conversationId as string | undefined;
+        const parsed = sendMessageSchema.safeParse(data);
+
+        if (
+          !participantId ||
+          !parsed.success ||
+          parsed.data.conversationId !== joinedConv
+        ) {
+          ack?.({ error: "Unauthorized" });
+          return;
+        }
+
+        try {
+          const forwarded = socket.handshake.headers["x-forwarded-for"];
+          const ipAddress =
+            (typeof forwarded === "string"
+              ? forwarded.split(",")[0]?.trim()
+              : undefined) ??
+            socket.handshake.address ??
+            "socket";
+
+          const payload = await persistTextMessage({
+            conversationId: parsed.data.conversationId,
+            participantId,
+            content: parsed.data.content,
+            ipAddress,
+          });
+
+          ack?.({ message: payload });
+        } catch {
+          ack?.({ error: "Failed to send message" });
+        }
+      }
+    );
 
     socket.on(
       "message:delivered",

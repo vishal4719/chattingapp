@@ -13,6 +13,7 @@ import {
   uploadChatFile,
   formatMessagePayload,
 } from "@/lib/s3";
+import { persistTextMessage } from "@/lib/send-message";
 import { emitNewMessage } from "@/lib/socket";
 import { notifyConversationMessage } from "@/lib/push";
 import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
@@ -172,35 +173,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return errorResponse("Message content is required", 400);
     }
 
-    const message = await prisma.message.create({
-      data: {
-        conversationId,
-        participantId: participant.id,
-        content: parsed.data.content,
-        type: "TEXT",
-        ipAddress,
-      },
-      include: {
-        participant: {
-          select: { id: true, displayName: true },
-        },
-      },
-    });
-
-    const [payload] = await Promise.all([
-      formatMessagePayload(message).then((formatted) => {
-        formatted.status = "SENT";
-        return formatted;
-      }),
-      createReceiptsForMessage(message.id, conversationId, participant.id),
-    ]);
-
-    emitNewMessage(conversationId, payload);
-    void notifyConversationMessage(conversationId, participant.id, {
-      content: payload.content,
-      type: payload.type ?? "TEXT",
-      fileName: payload.fileName,
-      participant: payload.participant,
+    const payload = await persistTextMessage({
+      conversationId,
+      participantId: participant.id,
+      content: parsed.data.content,
+      ipAddress,
     });
     return jsonResponse({ message: payload });
   } catch {

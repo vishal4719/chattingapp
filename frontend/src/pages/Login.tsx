@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api, ApiError, syncUserConversations } from "../lib/api";
+import { api, ApiError, syncAdminConversations, syncUserConversations } from "../lib/api";
 import {
   clearAllParticipantSessions,
   clearUserSession,
@@ -44,7 +44,8 @@ export function Login() {
       clearAllParticipantSessions();
       localStorage.setItem("adminToken", token);
       localStorage.setItem("adminUser", JSON.stringify(admin));
-      navigate("/admin-dashboard");
+      await syncAdminConversations();
+      navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
