@@ -7,6 +7,7 @@ import {
   ChatMessage,
   JoinNotification,
   CallEventNotification,
+  MessageReplyPreview,
 } from "../lib/api";
 import { createChatSocket, setupRoomJoin, sendTextMessageViaSocket } from "../lib/socket";
 import {
@@ -30,6 +31,8 @@ import { ApiError } from "../lib/api";
 import { formatTypingText } from "../lib/typing";
 import { buildCallEventText, notifyAppRefresh, type CallLeaveSummary } from "../lib/callSummary";
 import { showLocalNotification } from "../lib/notifications";
+import { downloadAdminChatExport } from "../lib/exportChat";
+import { formatLastMessagePreview } from "../components/AttachmentBubble";
 import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { Avatar } from "../components/Avatar";
@@ -87,6 +90,7 @@ export function Chat() {
   const [callJoining, setCallJoining] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [callSummary, setCallSummary] = useState<CallLeaveSummary | null>(null);
+  const [replyingTo, setReplyingTo] = useState<MessageReplyPreview | null>(null);
   const callParticipantsRef = useRef<Set<string>>(new Set());
   const callEndedRef = useRef(false);
   const callActiveRef = useRef(false);
@@ -204,6 +208,7 @@ export function Chat() {
     setError("");
     setConnected(false);
     setTypingUsers(new Map());
+    setReplyingTo(null);
     setLoading(true);
     resetCallStateRef.current();
 
@@ -520,10 +525,23 @@ export function Chat() {
     socketRef.current.emit("typing:stop", { conversationId });
   }, [conversationId]);
 
+  function handleReply(message: ChatMessage) {
+    setReplyingTo({
+      id: message.id,
+      content: message.preview ?? formatLastMessagePreview(message),
+      type: message.type,
+      fileName: message.fileName,
+      participant: message.participant,
+    });
+  }
+
   async function handleSend(content: string) {
     if (!conversationId || !session) return;
 
     emitTypingStop();
+
+    const replyTarget = replyingTo;
+    setReplyingTo(null);
 
     const optimisticId = `temp-${crypto.randomUUID()}`;
     const optimistic: ChatMessage = {
@@ -536,6 +554,7 @@ export function Chat() {
         id: session.participantId,
         displayName: session.displayName,
       },
+      replyTo: replyTarget,
     };
 
     setItems((prev) => upsertMessage(prev, optimistic));
@@ -543,7 +562,12 @@ export function Chat() {
     const socket = socketRef.current;
     if (socket?.connected) {
       try {
-        await sendTextMessageViaSocket(socket, conversationId, content);
+        await sendTextMessageViaSocket(
+          socket,
+          conversationId,
+          content,
+          replyTarget?.id
+        );
         notifyAppRefresh();
       } catch {
         setItems((prev) => removeMessageById(prev, optimisticId));
@@ -555,7 +579,8 @@ export function Chat() {
       const { message } = await api.sendMessage(
         conversationId,
         content,
-        session.sessionToken
+        session.sessionToken,
+        replyTarget?.id
       );
 
       setItems((prev) => upsertMessage(prev, { ...message, pending: false }));
@@ -563,6 +588,11 @@ export function Chat() {
     } catch {
       setItems((prev) => removeMessageById(prev, optimisticId));
     }
+  }
+
+  async function handleExportChat() {
+    if (!conversationId || !chatInfo) return;
+    await downloadAdminChatExport(conversationId, chatInfo.title);
   }
 
   async function handleLeaveGroup() {
@@ -825,6 +855,7 @@ export function Chat() {
         typingNames={typingNames}
         conversationId={conversationId!}
         participantToken={session.sessionToken}
+        onReply={handleReply}
       />
 
       <MessageInput
@@ -832,6 +863,9 @@ export function Chat() {
         onSendAttachment={handleSendAttachment}
         onTypingStart={emitTypingStart}
         onTypingStop={emitTypingStop}
+        replyTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
+        replyAsOwn={replyingTo?.participant.id === session.participantId}
       />
 
       {chatInfo && chatInfo.id === conversationId && (
@@ -844,6 +878,8 @@ export function Chat() {
           you={chatInfo.you}
           createdAt={chatInfo.createdAt}
           messageCount={chatInfo.messageCount}
+          canExport={isAdmin}
+          onExport={isAdmin ? handleExportChat : undefined}
           onLeave={chatInfo.type === "GROUP" ? handleLeaveGroup : undefined}
           onDirectChat={chatInfo.type === "GROUP" ? handleDirectChat : undefined}
         />

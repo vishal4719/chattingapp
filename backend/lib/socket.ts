@@ -16,6 +16,7 @@ import { persistTextMessage } from "./send-message";
 const sendMessageSchema = z.object({
   conversationId: z.string().min(1),
   content: z.string().min(1).max(5000),
+  replyToId: z.string().min(1).optional(),
 });
 
 declare global {
@@ -176,7 +177,7 @@ export function initSocket(server: HTTPServer): SocketIOServer {
     socket.on(
       "message:send",
       async (
-        data: { conversationId: string; content: string },
+        data: { conversationId: string; content: string; replyToId?: string },
         ack?: (response: { message?: MessagePayload; error?: string }) => void
       ) => {
         const participantId = socket.data.participantId as string | undefined;
@@ -206,6 +207,7 @@ export function initSocket(server: HTTPServer): SocketIOServer {
             participantId,
             content: parsed.data.content,
             ipAddress,
+            replyToId: parsed.data.replyToId,
           });
 
           ack?.({ message: payload });

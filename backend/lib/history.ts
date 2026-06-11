@@ -28,6 +28,13 @@ export async function getConversationHistory(
         participant: {
           select: { id: true, displayName: true },
         },
+        replyTo: {
+          include: {
+            participant: {
+              select: { id: true, displayName: true },
+            },
+          },
+        },
       },
     }),
     prisma.participant.findMany({

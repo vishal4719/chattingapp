@@ -20,6 +20,7 @@ import { errorResponse, jsonResponse, optionsResponse } from "@/lib/response";
 
 const messageSchema = z.object({
   content: z.string().min(1).max(5000),
+  replyToId: z.string().min(1).optional(),
 });
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -178,6 +179,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       participantId: participant.id,
       content: parsed.data.content,
       ipAddress,
+      replyToId: parsed.data.replyToId,
     });
     return jsonResponse({ message: payload });
   } catch {

@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import type { MessageReplyPreview } from "../lib/api";
+import { ReplyQuote } from "./ReplyQuote";
 
 interface Props {
   onSend: (content: string) => Promise<void>;
@@ -6,6 +8,9 @@ interface Props {
   onTypingStart?: () => void;
   onTypingStop?: () => void;
   disabled?: boolean;
+  replyTo?: MessageReplyPreview | null;
+  onCancelReply?: () => void;
+  replyAsOwn?: boolean;
 }
 
 const TYPING_STOP_DELAY = 2000;
@@ -25,6 +30,9 @@ export function MessageInput({
   onTypingStart,
   onTypingStop,
   disabled,
+  replyTo,
+  onCancelReply,
+  replyAsOwn = false,
 }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
@@ -131,6 +139,24 @@ export function MessageInput({
 
   return (
     <footer className="shrink-0 bg-[var(--wa-header)] border-t border-[var(--wa-border)]">
+      {replyTo && (
+        <div className="px-4 pt-3 flex items-start gap-2 border-b border-[var(--wa-border)]">
+          <div className="flex-1 min-w-0 bg-[var(--wa-input)] rounded-lg px-3 py-2">
+            <ReplyQuote reply={replyTo} isOwnBubble={replyAsOwn} compact />
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="p-1.5 mt-1 text-[var(--wa-text-secondary)] hover:text-[var(--wa-text)] shrink-0"
+            aria-label="Cancel reply"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {selectedFile && (
         <div className="px-4 pt-3 flex items-center gap-3">
           {previewUrl ? (

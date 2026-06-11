@@ -20,6 +20,8 @@ interface Props {
   you: Participant;
   createdAt: string;
   messageCount: number;
+  canExport?: boolean;
+  onExport?: () => Promise<void>;
   onLeave?: () => Promise<void>;
   onDirectChat?: (targetParticipantId: string) => Promise<void>;
 }
@@ -33,6 +35,8 @@ export function ChatInfoPanel({
   you,
   createdAt,
   messageCount,
+  canExport,
+  onExport,
   onLeave,
   onDirectChat,
 }: Props) {
@@ -40,6 +44,7 @@ export function ChatInfoPanel({
     null
   );
   const [leaving, setLeaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [directLoading, setDirectLoading] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -75,6 +80,22 @@ export function ChatInfoPanel({
       );
     } finally {
       setDirectLoading(false);
+    }
+  }
+
+  async function handleExport() {
+    if (!onExport) return;
+
+    setExporting(true);
+    setActionError("");
+    try {
+      await onExport();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Could not export chat"
+      );
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -127,6 +148,34 @@ export function ChatInfoPanel({
               </div>
             </div>
           </section>
+
+          {canExport && onExport && (
+            <section className="py-3 border-b border-[var(--wa-border)]">
+              <p className="px-6 py-2 text-sm text-[var(--wa-green)] uppercase tracking-wide">
+                Export chat
+              </p>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exporting}
+                className="w-full flex items-center gap-4 px-6 py-3 text-left hover:bg-[var(--wa-hover)] disabled:opacity-50"
+              >
+                <span className="text-[var(--wa-text-secondary)]">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                  </svg>
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[17px]">
+                    {exporting ? "Exporting..." : "Export chat"}
+                  </p>
+                  <p className="text-sm text-[var(--wa-text-secondary)]">
+                    Download all messages as a text file
+                  </p>
+                </div>
+              </button>
+            </section>
+          )}
 
           <section className="py-3 border-b border-[var(--wa-border)]">
             <p className="px-6 py-2 text-sm text-[var(--wa-green)] uppercase tracking-wide">
@@ -218,13 +267,16 @@ export function ChatInfoPanel({
             </section>
           )}
 
+          {actionError && (
+            <section className="px-6 py-2">
+              <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">
+                {actionError}
+              </p>
+            </section>
+          )}
+
           {onLeave && isGroup && (
             <section className="py-4 px-6 space-y-3">
-              {actionError && (
-                <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">
-                  {actionError}
-                </p>
-              )}
               <button
                 type="button"
                 onClick={handleLeave}

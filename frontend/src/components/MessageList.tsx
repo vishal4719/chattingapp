@@ -6,6 +6,8 @@ import { Avatar } from "./Avatar";
 import { TypingIndicator } from "./TypingIndicator";
 import { MessageStatusTicks } from "./MessageStatusTicks";
 import { AttachmentBubble, isAttachmentMessage } from "./AttachmentBubble";
+import { ReplyQuote } from "./ReplyQuote";
+import type { ChatMessage } from "../lib/api";
 
 interface Props {
   items: ChatItem[];
@@ -15,6 +17,7 @@ interface Props {
   conversationId: string;
   participantToken: string;
   className?: string;
+  onReply?: (message: ChatMessage) => void;
 }
 
 export function MessageList({
@@ -25,6 +28,7 @@ export function MessageList({
   conversationId,
   participantToken,
   className = "",
+  onReply,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,7 +88,7 @@ export function MessageList({
         return (
           <div
             key={item.id}
-            className={`flex ${isOwn ? "justify-end" : "justify-start"} ${
+            className={`group flex ${isOwn ? "justify-end" : "justify-start"} ${
               showAvatar ? "mt-2" : "mt-0.5"
             }`}
           >
@@ -96,13 +100,31 @@ export function MessageList({
               </div>
             )}
 
+            <div className={`relative max-w-[65%] ${onReply ? "group/msg" : ""}`}>
+              {onReply && (
+                <button
+                  type="button"
+                  onClick={() => onReply(item)}
+                  className={`absolute top-1 z-10 p-1.5 rounded-full bg-[var(--wa-header)] text-[var(--wa-text-secondary)] hover:text-[var(--wa-text)] shadow opacity-0 group-hover/msg:opacity-100 transition ${
+                    isOwn ? "-left-9" : "-right-9"
+                  }`}
+                  aria-label="Reply"
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-9.1-11-11.1z" />
+                  </svg>
+                </button>
+              )}
             <div
-              className={`relative max-w-[65%] px-2 py-1.5 pb-2 shadow-sm ${
+              className={`relative px-2 py-1.5 pb-2 shadow-sm ${
                 isOwn
                   ? "bg-[var(--wa-green-dark)] rounded-lg rounded-tr-none"
                   : "bg-[var(--wa-incoming)] rounded-lg rounded-tl-none"
               }`}
             >
+              {item.replyTo && (
+                <ReplyQuote reply={item.replyTo} isOwnBubble={isOwn} />
+              )}
               {isGroup && !isOwn && showAvatar && (
                 <p
                   className="text-[13px] font-medium mb-0.5 px-1"
@@ -130,6 +152,7 @@ export function MessageList({
                   <MessageStatusTicks status={item.status} pending={item.pending} />
                 )}
               </div>
+            </div>
             </div>
           </div>
         );

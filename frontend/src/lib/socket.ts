@@ -53,14 +53,15 @@ export function joinInboxRooms(socket: Socket): void {
 export function sendTextMessageViaSocket(
   socket: Socket,
   conversationId: string,
-  content: string
+  content: string,
+  replyToId?: string
 ): Promise<ChatMessage> {
   return new Promise((resolve, reject) => {
     socket
       .timeout(15000)
       .emit(
         "message:send",
-        { conversationId, content },
+        { conversationId, content, ...(replyToId ? { replyToId } : {}) },
         (err: Error | null, response: { message?: ChatMessage; error?: string }) => {
           if (err) {
             reject(err);

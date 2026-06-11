@@ -40,6 +40,14 @@ export interface ConversationDetail extends Omit<Conversation, "participantCount
 export type MessageType = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
 export type MessageStatus = "SENT" | "DELIVERED" | "READ";
 
+export interface MessageReplyPreview {
+  id: string;
+  content: string;
+  type?: MessageType;
+  fileName?: string | null;
+  participant: { id: string; displayName: string };
+}
+
 export interface ChatMessage {
   id: string;
   content: string;
@@ -53,6 +61,7 @@ export interface ChatMessage {
   attachmentUrl?: string;
   preview?: string;
   participant: { id: string; displayName: string };
+  replyTo?: MessageReplyPreview;
 }
 
 export interface JoinNotification {
@@ -323,11 +332,18 @@ export const api = {
   sendMessage: (
     conversationId: string,
     content: string,
-    participantToken: string
+    participantToken: string,
+    replyToId?: string
   ) =>
     request<{ message: ChatMessage }>(
       `/api/conversations/${conversationId}/messages`,
-      { method: "POST", body: JSON.stringify({ content }) },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          content,
+          ...(replyToId ? { replyToId } : {}),
+        }),
+      },
       participantToken
     ),
 

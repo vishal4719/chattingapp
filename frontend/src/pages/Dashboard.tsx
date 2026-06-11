@@ -5,6 +5,7 @@ import { Avatar } from "../components/Avatar";
 import { AdminSettings } from "../components/AdminSettings";
 import { NotificationBanner } from "../components/NotificationBanner";
 import { saveParticipantSession } from "../lib/storage";
+import { downloadAdminChatExport } from "../lib/exportChat";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [copyLabel, setCopyLabel] = useState<Record<string, string>>({});
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [adminProfile, setAdminProfile] = useState<{
     accessType?: string;
@@ -126,6 +128,18 @@ export function Dashboard() {
       await loadConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  }
+
+  async function handleExportChat(conv: Conversation) {
+    setExportingId(conv.id);
+    setError("");
+    try {
+      await downloadAdminChatExport(conv.id, conv.title);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export chat");
+    } finally {
+      setExportingId(null);
     }
   }
 
@@ -287,6 +301,13 @@ export function Dashboard() {
                           {expanded ? "Hide info" : "Group info"}
                         </button>
                         <button
+                          onClick={() => handleExportChat(conv)}
+                          disabled={exportingId === conv.id}
+                          className="text-sm px-3 py-1.5 rounded-lg bg-[var(--wa-hover)] hover:bg-[#374955] disabled:opacity-50"
+                        >
+                          {exportingId === conv.id ? "Exporting..." : "Export chat"}
+                        </button>
+                        <button
                           onClick={() => handleDemolish(conv.id)}
                           className="text-sm px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white"
                         >
@@ -296,7 +317,20 @@ export function Dashboard() {
                     )}
 
                     {expanded && detail?.id === conv.id && (
-                      <div className="border-t border-[var(--wa-border)] bg-[var(--wa-header)] p-4">
+                      <div className="border-t border-[var(--wa-border)] bg-[var(--wa-header)] p-4 space-y-4">
+                        <button
+                          type="button"
+                          onClick={() => handleExportChat(conv)}
+                          disabled={exportingId === conv.id}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--wa-panel)] hover:bg-[var(--wa-hover)] disabled:opacity-50 text-left"
+                        >
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" className="text-[var(--wa-text-secondary)] shrink-0">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                          </svg>
+                          <span className="text-sm">
+                            {exportingId === conv.id ? "Exporting chat..." : "Export chat"}
+                          </span>
+                        </button>
                         <p className="text-xs text-[var(--wa-green)] uppercase mb-3">
                           {detail.participants.length} participants
                         </p>

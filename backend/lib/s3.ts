@@ -177,6 +177,14 @@ export async function getAttachmentUrl(s3Key: string): Promise<string> {
 
 export type MessageStatus = "SENT" | "DELIVERED" | "READ";
 
+export interface MessageReplyPreview {
+  id: string;
+  content: string;
+  type: MessageType;
+  fileName?: string | null;
+  participant: { id: string; displayName: string };
+}
+
 export interface MessagePayload {
   id: string;
   content: string;
@@ -188,6 +196,7 @@ export interface MessagePayload {
   attachmentUrl?: string;
   status?: MessageStatus;
   participant: { id: string; displayName: string };
+  replyTo?: MessageReplyPreview;
 }
 
 export async function formatMessagePayload(message: {
@@ -200,6 +209,13 @@ export async function formatMessagePayload(message: {
   fileSize: number | null;
   s3Key: string | null;
   participant: { id: string; displayName: string };
+  replyTo?: {
+    id: string;
+    content: string;
+    type: MessageType;
+    fileName: string | null;
+    participant: { id: string; displayName: string };
+  } | null;
 }): Promise<MessagePayload> {
   const payload: MessagePayload = {
     id: message.id,
@@ -214,6 +230,16 @@ export async function formatMessagePayload(message: {
     payload.mimeType = message.mimeType;
     payload.fileSize = message.fileSize;
     payload.attachmentUrl = await getAttachmentUrl(message.s3Key);
+  }
+
+  if (message.replyTo) {
+    payload.replyTo = {
+      id: message.replyTo.id,
+      content: formatLastMessagePreview(message.replyTo),
+      type: message.replyTo.type,
+      fileName: message.replyTo.fileName,
+      participant: message.replyTo.participant,
+    };
   }
 
   return payload;
