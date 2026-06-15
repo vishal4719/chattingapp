@@ -1,12 +1,14 @@
 import { Outlet, useParams } from "react-router-dom";
 import { ChatSidebar } from "./ChatSidebar";
 import { NotificationBanner } from "./NotificationBanner";
+import { InstallBanner } from "./InstallBanner";
 
 export function WhatsAppLayout() {
   const { conversationId } = useParams();
 
   return (
     <div className="h-dvh max-h-dvh flex flex-col bg-[var(--wa-bg)] overflow-hidden">
+      <InstallBanner />
       <NotificationBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden">
       <div

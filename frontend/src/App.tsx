@@ -3,6 +3,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { UserProtectedRoute } from "./components/UserProtectedRoute";
 import { WhatsAppLayout } from "./components/WhatsAppLayout";
 import { NotificationsBootstrap } from "./components/NotificationsBootstrap";
+import { PwaBootstrap } from "./components/PwaBootstrap";
 import { SeoManager } from "./components/SeoManager";
 import { Login } from "./pages/Login";
 import { UserRegister } from "./pages/UserRegister";
@@ -14,6 +15,7 @@ import { ChatRoute } from "./pages/ChatRoute";
 export default function App() {
   return (
     <>
+      <PwaBootstrap />
       <NotificationsBootstrap />
       <SeoManager />
       <Routes>

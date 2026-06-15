@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { getServiceWorkerRegistration } from "./pwa";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -67,11 +68,8 @@ export async function registerPushSubscription(): Promise<boolean> {
   const { enabled, publicKey } = await api.getPushConfig();
   if (!enabled || !publicKey) return false;
 
-  const registration = await navigator.serviceWorker.register("/sw.js", {
-    scope: "/",
-  });
-
-  await navigator.serviceWorker.ready;
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) return false;
 
   let subscription = await registration.pushManager.getSubscription();
 
