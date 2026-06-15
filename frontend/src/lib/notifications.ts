@@ -16,7 +16,8 @@ export function notificationsSupported(): boolean {
   return (
     typeof window !== "undefined" &&
     "Notification" in window &&
-    "serviceWorker" in navigator
+    "serviceWorker" in navigator &&
+    "PushManager" in window
   );
 }
 
@@ -43,6 +44,22 @@ export function showLocalNotification(
   }
 
   const tag = conversationId ?? url ?? title;
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.ready
+      .then((registration) =>
+        registration.showNotification(title, {
+          body,
+          icon: "/icon-192.png",
+          badge: "/icon-192.png",
+          tag,
+          data: { url: url ? new URL(url, window.location.origin).href : window.location.href },
+        })
+      )
+      .catch(() => undefined);
+    return;
+  }
+
   const notification = new Notification(title, {
     body,
     icon: "/icon-192.png",
@@ -71,14 +88,15 @@ export async function registerPushSubscription(): Promise<boolean> {
   const registration = await getServiceWorkerRegistration();
   if (!registration) return false;
 
-  let subscription = await registration.pushManager.getSubscription();
-
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-    });
+  const existing = await registration.pushManager.getSubscription();
+  if (existing) {
+    await existing.unsubscribe();
   }
+
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+  });
 
   const json = subscription.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
@@ -106,17 +124,30 @@ export async function initNotifications(): Promise<void> {
   try {
     await registerPushSubscription();
   } catch {
-    // Push may fail if VAPID is not configured on the server
+    // Push may fail if server/database is not ready
   }
 }
 
 export async function enableNotifications(): Promise<boolean> {
+  if (!notificationsSupported()) return false;
+
   const permission = await requestNotificationPermission();
   if (permission !== "granted") return false;
 
   try {
     return await registerPushSubscription();
   } catch {
-    return Notification.permission === "granted";
+    return false;
   }
+}
+
+export function getNotificationUnsupportedReason(): string | null {
+  if (typeof window === "undefined") return null;
+  if (!("Notification" in window)) return "This browser does not support notifications.";
+  if (!("serviceWorker" in navigator)) return "Notifications require a supported browser (Chrome recommended).";
+  if (!("PushManager" in window)) return "Push notifications are not available in this browser or app.";
+  if (Notification.permission === "denied") {
+    return "Notifications are blocked. Enable them in your browser or phone settings.";
+  }
+  return null;
 }

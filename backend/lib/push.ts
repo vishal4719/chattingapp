@@ -56,8 +56,10 @@ async function sendToSubscription(
     );
   } catch (err) {
     const status = (err as { statusCode?: number }).statusCode;
-    if (status === 404 || status === 410) {
+    if (status === 404 || status === 410 || status === 401 || status === 403) {
       await prisma.pushSubscription.delete({ where: { id: subscription.id } }).catch(() => undefined);
+    } else {
+      console.error("[push] send failed:", status, subscription.endpoint.slice(0, 48));
     }
   }
 }

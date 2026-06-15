@@ -59,7 +59,8 @@ export async function POST(req: NextRequest) {
     });
 
     return jsonResponse({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error("[push] subscribe failed:", err);
     return errorResponse("Failed to save subscription", 500);
   }
 }

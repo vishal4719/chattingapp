@@ -71,7 +71,10 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+  const rawUrl = event.notification.data?.url || "/";
+  const url = rawUrl.startsWith("http")
+    ? new URL(rawUrl).pathname + new URL(rawUrl).search
+    : rawUrl;
 
   event.waitUntil(
     clients
