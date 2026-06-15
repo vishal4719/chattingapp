@@ -7,6 +7,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { MessageStatusTicks } from "./MessageStatusTicks";
 import { AttachmentBubble, isAttachmentMessage } from "./AttachmentBubble";
 import { ReplyQuote } from "./ReplyQuote";
+import { SwipeToReply } from "./SwipeToReply";
 import type { ChatMessage } from "../lib/api";
 
 interface Props {
@@ -100,12 +101,17 @@ export function MessageList({
               </div>
             )}
 
-            <div className={`relative max-w-[65%] ${onReply ? "group/msg" : ""}`}>
+            <SwipeToReply
+              message={item}
+              isOwn={isOwn}
+              onReply={onReply}
+              className={`max-w-[65%] ${onReply ? "group/msg" : ""}`}
+            >
               {onReply && (
                 <button
                   type="button"
                   onClick={() => onReply(item)}
-                  className={`absolute top-1 z-10 p-1.5 rounded-full bg-[var(--wa-header)] text-[var(--wa-text-secondary)] hover:text-[var(--wa-text)] shadow opacity-0 group-hover/msg:opacity-100 transition ${
+                  className={`absolute top-1 z-10 p-1.5 rounded-full bg-[var(--wa-header)] text-[var(--wa-text-secondary)] hover:text-[var(--wa-text)] shadow opacity-0 max-md:hidden md:group-hover/msg:opacity-100 transition ${
                     isOwn ? "-left-9" : "-right-9"
                   }`}
                   aria-label="Reply"
@@ -115,13 +121,13 @@ export function MessageList({
                   </svg>
                 </button>
               )}
-            <div
-              className={`relative px-2 py-1.5 pb-2 shadow-sm ${
-                isOwn
-                  ? "bg-[var(--wa-green-dark)] rounded-lg rounded-tr-none"
-                  : "bg-[var(--wa-incoming)] rounded-lg rounded-tl-none"
-              }`}
-            >
+              <div
+                className={`relative px-2 py-1.5 pb-2 shadow-sm ${
+                  isOwn
+                    ? "bg-[var(--wa-green-dark)] rounded-lg rounded-tr-none"
+                    : "bg-[var(--wa-incoming)] rounded-lg rounded-tl-none"
+                }`}
+              >
               {item.replyTo && (
                 <ReplyQuote reply={item.replyTo} isOwnBubble={isOwn} />
               )}
@@ -152,8 +158,8 @@ export function MessageList({
                   <MessageStatusTicks status={item.status} pending={item.pending} />
                 )}
               </div>
-            </div>
-            </div>
+              </div>
+            </SwipeToReply>
           </div>
         );
       })}
