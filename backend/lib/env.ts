@@ -13,8 +13,32 @@ function optional(name: string): string | undefined {
   return value || undefined;
 }
 
+const CAPACITOR_ORIGINS = [
+  "https://localhost",
+  "http://localhost",
+  "capacitor://localhost",
+];
+
 export function getFrontendUrl(): string {
   return required("FRONTEND_URL").replace(/\/$/, "");
+}
+
+export function getAllowedOrigins(): string[] {
+  const extras =
+    optional("EXTRA_CORS_ORIGINS")
+      ?.split(",")
+      .map((origin) => origin.trim().replace(/\/$/, ""))
+      .filter(Boolean) ?? [];
+
+  return [...new Set([getFrontendUrl(), ...CAPACITOR_ORIGINS, ...extras])];
+}
+
+export function resolveCorsOrigin(requestOrigin: string | null | undefined): string {
+  const normalized = requestOrigin?.replace(/\/$/, "");
+  if (normalized && getAllowedOrigins().includes(normalized)) {
+    return normalized;
+  }
+  return getFrontendUrl();
 }
 
 export function getJwtSecret(): string {

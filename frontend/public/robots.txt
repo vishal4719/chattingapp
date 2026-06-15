@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://chattingapp-ivory.vercel.app/sitemap.xml
+Sitemap: https://chatapp.vishaltech.in/sitemap.xml

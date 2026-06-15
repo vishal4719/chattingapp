@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 import { verifyAdminToken, verifyUserToken } from "./auth";
 import { getAdminById, getWorkspaceId } from "./admin-workspace";
 import type { MessagePayload } from "./s3";
-import { getFrontendUrl } from "./env";
+import { getAllowedOrigins } from "./env";
 import {
   markConversationRead,
   markMessageDelivered,
@@ -33,7 +33,13 @@ function getIO(): SocketIOServer | null {
 export function initSocket(server: HTTPServer): SocketIOServer {
   io = new SocketIOServer(server, {
     cors: {
-      origin: getFrontendUrl(),
+      origin: (origin, callback) => {
+        if (!origin || getAllowedOrigins().includes(origin.replace(/\/$/, ""))) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error("Not allowed by CORS"));
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },

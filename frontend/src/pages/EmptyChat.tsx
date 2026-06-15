@@ -6,7 +6,7 @@ export function EmptyChat() {
       <div className="text-center px-8 max-w-md">
         <AppLogo size={120} className="mx-auto mb-8 opacity-95" />
         <h1 className="text-[32px] font-light text-[var(--wa-text)] mb-3">
-          ChatApp Web
+          PandaMind
         </h1>
         <p className="text-[var(--wa-text-secondary)] text-sm leading-relaxed">
           Send and receive messages without keeping your phone connected.

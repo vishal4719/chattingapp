@@ -45,8 +45,8 @@ export function showLocalNotification(
   const tag = conversationId ?? url ?? title;
   const notification = new Notification(title, {
     body,
-    icon: "/icon.svg",
-    badge: "/icon.svg",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     tag,
   });
 

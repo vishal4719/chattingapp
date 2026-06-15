@@ -1,11 +1,11 @@
 {
-  "name": "ChatApp — Group & Direct Messaging",
-  "short_name": "ChatApp",
+  "name": "PandaMind — Group & Direct Messaging",
+  "short_name": "PandaMind",
   "description": "Secure group chat, direct messaging, video calls, voice calls, and screen sharing.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b141a",
-  "theme_color": "#1A91FF",
+  "background_color": "#1a1033",
+  "theme_color": "#7C3AED",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -30,12 +30,6 @@
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]

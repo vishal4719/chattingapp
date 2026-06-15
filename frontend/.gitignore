@@ -1,0 +1,18 @@
+# Mobile native builds — see ANDROID.md and IOS.md
+
+# Android build output
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+*.apk
+*.aab
+!public/downloads/pandamind.apk
+
+# iOS build output
+ios/App/build/
+ios/App/DerivedData/
+*.ipa
+
+# Capacitor
+.capacitor/

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-const SITE_NAME = "ChatApp";
+const SITE_NAME = "PandaMind";
 const DEFAULT_TITLE = `${SITE_NAME} — Group Chat, Direct Messages & Video Calls`;
 const DEFAULT_DESCRIPTION =
   "Modern messaging with group chats, private DMs, video calls, voice calls, and screen sharing.";
@@ -9,11 +9,15 @@ const DEFAULT_DESCRIPTION =
 const ROUTE_META: Record<string, { title: string; description?: string }> = {
   "/login": {
     title: `Sign In | ${SITE_NAME}`,
-    description: "Sign in to ChatApp for group chat, direct messages, and video calls.",
+    description: "Sign in to PandaMind for group chat, direct messages, and video calls.",
   },
   "/register": {
     title: `Create Account | ${SITE_NAME}`,
-    description: "Register for ChatApp to join groups and message privately.",
+    description: "Register for PandaMind to join groups and message privately.",
+  },
+  "/download": {
+    title: `Download Android App | ${SITE_NAME}`,
+    description: "Download PandaMind for Android — group chat, direct messages, and video calls.",
   },
   "/dashboard": {
     title: `Chats | ${SITE_NAME}`,
@@ -36,7 +40,7 @@ function getMetaForPath(pathname: string) {
   if (pathname.startsWith("/join/")) {
     return {
       title: `Join Group | ${SITE_NAME}`,
-      description: "Accept an invite and join a group on ChatApp.",
+      description: "Accept an invite and join a group on PandaMind.",
     };
   }
   return { title: DEFAULT_TITLE, description: DEFAULT_DESCRIPTION };

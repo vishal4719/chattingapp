@@ -11,6 +11,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { EmptyChat } from "./pages/EmptyChat";
 import { Join } from "./pages/Join";
 import { ChatRoute } from "./pages/ChatRoute";
+import { Download } from "./pages/Download";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/user-login" element={<Navigate to="/login" replace />} />
       <Route path="/register" element={<UserRegister />} />
+      <Route path="/download" element={<Download />} />
       <Route path="/join/:token" element={<Join />} />
       <Route element={<UserProtectedRoute />}>
         <Route element={<WhatsAppLayout />}>

@@ -1,5 +1,5 @@
-const CACHE_NAME = "chatapp-shell-v1";
-const SHELL_URLS = ["/", "/index.html", "/icon.svg", "/icon-192.png", "/icon-512.png"];
+const CACHE_NAME = "pandamind-shell-v1";
+const SHELL_URLS = ["/", "/index.html", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -60,8 +60,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
       tag: data.conversationId || data.url,
       data: { url: data.url },
       renotify: true,

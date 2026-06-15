@@ -6,8 +6,8 @@ interface Props {
 export function AppLogo({ size = 64, className = "" }: Props) {
   return (
     <img
-      src="/icon.svg"
-      alt="ChatApp — group chat and messaging logo"
+      src="/icon-512.png"
+      alt="PandaMind — group chat and messaging"
       width={size}
       height={size}
       className={`rounded-2xl shadow-sm ${className}`}

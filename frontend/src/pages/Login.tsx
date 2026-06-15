@@ -58,7 +58,7 @@ export function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <AppLogo size={88} className="mx-auto mb-4" />
-          <h1 className="text-2xl font-light text-[var(--wa-text)]">Sign in to ChatApp</h1>
+          <h1 className="text-2xl font-light text-[var(--wa-text)]">Sign in to PandaMind</h1>
           <p className="text-[var(--wa-text-secondary)] text-sm mt-2">
             Users go to chats · Admins go to the dashboard
           </p>

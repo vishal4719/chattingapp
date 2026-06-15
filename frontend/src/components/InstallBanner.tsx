@@ -76,10 +76,10 @@ export function InstallBanner() {
       </svg>
       <div className="flex-1 min-w-0 text-[var(--wa-text)]">
         {canPromptInstall ? (
-          <p>Install ChatApp for quick access from your home screen.</p>
+          <p>Install PandaMind for quick access from your home screen.</p>
         ) : (
           <p>
-            Install ChatApp: tap <span className="font-medium">Share</span>, then{" "}
+            Install PandaMind: tap <span className="font-medium">Share</span>, then{" "}
             <span className="font-medium">Add to Home Screen</span>.
           </p>
         )}
