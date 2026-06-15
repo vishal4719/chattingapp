@@ -123,11 +123,29 @@ async function request<T>(
   else if (userToken) headers.Authorization = `Bearer ${userToken}`;
   if (participantToken) headers["X-Participant-Token"] = participantToken;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch {
+    throw new ApiError(
+      "Cannot reach server. Check your internet connection and try again.",
+      0
+    );
+  }
+  let data: Record<string, unknown> = {};
+  try {
+    data = await res.json();
+  } catch {
+    if (!res.ok) {
+      throw new ApiError(`Server error (${res.status})`, res.status);
+    }
+  }
 
   if (!res.ok) {
-    throw new ApiError(data.error ?? "Request failed", res.status);
+    throw new ApiError(
+      typeof data.error === "string" ? data.error : "Request failed",
+      res.status
+    );
   }
 
   return data as T;

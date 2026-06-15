@@ -1,121 +1,69 @@
 # Android APK Build
 
-This wraps the React app in a native Android shell using [Capacitor](https://capacitorjs.com/).
+The PandaMind Android app is a **native shell** that loads your live website:
+
+| | URL |
+|---|-----|
+| **App loads** | [https://chatapp.vishaltech.in](https://chatapp.vishaltech.in) |
+| **API / WebSocket** | [https://api.vishaltech.in](https://api.vishaltech.in) |
+
+Same setup as opening the site in Chrome — **no bundled localhost, no extra CORS config**.
 
 ## Prerequisites
 
-1. **Node.js** — already used for the frontend
-2. **Java JDK 21** — required by Capacitor Android (JDK 17 is too old; JDK 25 may fail)
+1. **Node.js**
+2. **Java JDK 21**
 3. **Android Studio** — [developer.android.com/studio](https://developer.android.com/studio)
-   - Install Android SDK (API 34+ recommended)
-   - Accept SDK licenses in Android Studio → SDK Manager
 
-## One-time setup
-
-### 1. Configure production backend URLs
-
-The APK bundles the frontend and talks to your **production** backend (not localhost).
+## Build a debug APK
 
 ```bash
 cd frontend
-cp .env.android.example .env.android
+npm install
+npm run build:android    # sync Capacitor + copy config
+npm run android:apk      # produces APK + copies to public/downloads/
 ```
 
-Edit `.env.android` with your live backend URLs:
+APK output: `frontend/public/downloads/pandamind.apk`
+
+Users need **internet** to open the app (it loads the live site).
+
+## When you change the website
+
+Deploy frontend to Vercel as usual — **the app updates automatically**, no APK rebuild needed.
+
+Rebuild the APK only when changing **native** things (app icon, permissions, app name).
+
+## Backend env (AWS)
+
+Standard production config — nothing special for the app:
+
+```env
+FRONTEND_URL=https://chatapp.vishaltech.in
+API_PUBLIC_URL=https://api.vishaltech.in
+```
+
+Vercel frontend env:
 
 ```env
 VITE_API_URL=https://api.vishaltech.in
 VITE_WS_URL=https://api.vishaltech.in
 ```
 
-### 2. Deploy backend CORS update
+## Install on phone
 
-The backend must allow Capacitor's origin (`https://localhost`). The repo already includes this in `getAllowedOrigins()`. **Redeploy your backend** after pulling these changes.
-
-Optionally add extra origins in backend `.env`:
-
-```env
-EXTRA_CORS_ORIGINS=https://localhost,capacitor://localhost
-```
-
-### 3. Add the Android platform (first time only)
-
-```bash
-cd frontend
-npm install
-npm run build -- --mode android   # needs .env.android first
-npx cap add android
-npx cap sync android
-```
-
-## Build a debug APK (for testing / sideloading)
-
-```bash
-cd frontend
-npm run build:android    # builds web app + syncs to android/
-npm run android:apk      # produces debug APK
-```
-
-APK output:
-
-```
-frontend/android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-Copy `app-debug.apk` to your phone and install it (enable "Install unknown apps" for your file manager).
-
-The hosted download page is at `/download` — it serves `public/downloads/pandamind.apk`. After rebuilding the APK, run `npm run android:apk` to refresh the file in `public/`.
-
-## Build via Android Studio (optional)
-
-```bash
-cd frontend
-npm run build:android
-npm run android:open
-```
-
-In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**
-
-## Release APK (Play Store or signed sideload)
-
-1. Android Studio → **Build → Generate Signed Bundle / APK**
-2. Create or use a keystore
-3. Choose **release** build variant
-
-Or from CLI after configuring signing in `android/app/build.gradle`:
-
-```bash
-cd frontend/android
-./gradlew assembleRelease
-```
-
-## Rebuild after code changes
-
-Whenever you change frontend code:
-
-```bash
-cd frontend
-npm run build:android
-npm run android:apk
-```
-
-## Permissions
-
-The Android project includes:
-
-- Internet (API + WebSocket + LiveKit)
-- Camera and microphone (video/voice calls)
+1. Download from [https://chatapp.vishaltech.in/download](https://chatapp.vishaltech.in/download)
+2. Install `PandaMind.apk`
+3. Open and sign in — same login as the website
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
-| API calls fail / CORS errors | Redeploy backend with Capacitor CORS support; verify `.env.android` URLs |
-| Blank white screen | Run `npm run build:android` again; check `adb logcat` |
-| `./gradlew` not found | Open Android Studio once to finish SDK setup |
-| JDK errors | Use JDK 21: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` then rebuild |
+| Login / fetch fails | Confirm website works in Chrome first; check internet on phone |
+| Blank screen | Phone needs internet; verify chatapp.vishaltech.in loads in browser |
+| `./gradlew` errors | Use JDK 21: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` |
 
-## What you get
+## Optional: `.env.android`
 
-- **Debug APK** — install directly on Android phones (no Play Store)
-- **Not** a Play Store listing — that requires a signed release build + Google Play Console account ($25 one-time)
+Not needed for the APK anymore. The app loads the live site where Vercel already has `VITE_API_URL` and `VITE_WS_URL` set.

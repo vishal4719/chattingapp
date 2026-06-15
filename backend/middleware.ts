@@ -5,22 +5,22 @@ export function middleware(request: NextRequest) {
   const origin = request.headers.get("origin");
   const corsOrigin = resolveCorsOrigin(origin);
 
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": corsOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Participant-Token",
+    "Access-Control-Allow-Credentials": "true",
+  };
+
   if (request.method === "OPTIONS") {
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": corsOrigin,
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers":
-          "Content-Type, Authorization, X-Participant-Token",
-        "Access-Control-Allow-Credentials": "true",
-      },
-    });
+    return new NextResponse(null, { status: 204, headers: corsHeaders });
   }
 
   const response = NextResponse.next();
-  response.headers.set("Access-Control-Allow-Origin", corsOrigin);
-  response.headers.set("Access-Control-Allow-Credentials", "true");
+  for (const [key, value] of Object.entries(corsHeaders)) {
+    response.headers.set(key, value);
+  }
   return response;
 }
 

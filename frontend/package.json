@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:android": "tsc -b && vite build --mode android && npx cap sync android",
+    "build:android": "npm run build && npx cap sync android",
     "build:ios": "tsc -b && vite build --mode android && npx cap sync ios",
     "android:open": "npx cap open android",
     "android:run": "npx cap run android",

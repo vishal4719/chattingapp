@@ -8,10 +8,10 @@ import {
   safeExportFilename,
 } from "@/lib/export-chat";
 import {
-  corsHeaders,
   errorResponse,
   optionsResponse,
 } from "@/lib/response";
+import { resolveCorsOrigin } from "@/lib/env";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -71,7 +71,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
   return new Response(text, {
     status: 200,
     headers: {
-      ...corsHeaders(),
+      "Access-Control-Allow-Origin": resolveCorsOrigin(req.headers.get("origin")),
+      "Access-Control-Allow-Credentials": "true",
       "Content-Type": "text/plain; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
     },
