@@ -50,6 +50,45 @@ VITE_API_URL=https://api.vishaltech.in
 VITE_WS_URL=https://api.vishaltech.in
 ```
 
+## Push notifications (FCM — free)
+
+Mobile alerts use **Firebase Cloud Messaging** (not browser web push).
+
+### 1. Firebase project
+
+1. [Firebase Console](https://console.firebase.google.com/) → create project
+2. **Add Android app** → package name `com.vishal.pandamind`
+3. Download `google-services.json` → place at `frontend/android/app/google-services.json`
+4. **Project settings → Service accounts** → **Generate new private key** (JSON)
+
+### 2. Backend env (AWS)
+
+Either paste the full JSON:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+Or set:
+
+```env
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@your-project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Run migration on AWS:
+
+```bash
+npx prisma migrate deploy
+```
+
+Rebuild APK after adding `google-services.json`:
+
+```bash
+npm run android:apk
+```
+
 ## Install on phone
 
 1. Download from [https://chatapp.vishaltech.in/download](https://chatapp.vishaltech.in/download)

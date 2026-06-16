@@ -432,15 +432,12 @@ export const api = {
     ),
 
   getPushConfig: () =>
-    request<{ enabled: boolean; publicKey: string | null }>("/api/push/vapid-key"),
+    request<{ enabled: boolean; provider: string }>("/api/push/config"),
 
-  registerPushSubscription: (subscription: {
-    endpoint: string;
-    keys: { p256dh: string; auth: string };
-  }) =>
+  registerFcmToken: (payload: { token: string; platform: "android" | "ios" }) =>
     request<{ ok: boolean }>("/api/push/subscribe", {
       method: "POST",
-      body: JSON.stringify(subscription),
+      body: JSON.stringify(payload),
     }),
 };
 

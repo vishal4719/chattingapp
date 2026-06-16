@@ -1,33 +1,22 @@
-import webpush from "web-push";
+import admin from "firebase-admin";
 import { prisma } from "./prisma";
-import { getFrontendUrl, getVapidPrivateKey, getVapidPublicKey, getVapidSubject } from "./env";
+import { getFirebaseServiceAccount, getFrontendUrl, isFcmConfigured } from "./env";
 import { formatLastMessagePreview } from "./s3";
 
-let configured = false;
+let firebaseApp: admin.app.App | null = null;
 
-function ensureConfigured(): boolean {
-  const publicKey = getVapidPublicKey();
-  const privateKey = getVapidPrivateKey();
-  const subject = getVapidSubject();
-
-  if (!publicKey || !privateKey || !subject) {
-    return false;
-  }
-
-  if (!configured) {
-    webpush.setVapidDetails(subject, publicKey, privateKey);
-    configured = true;
-  }
-
-  return true;
+function getFirebaseApp(): admin.app.App | null {
+  if (firebaseApp) return firebaseApp;
+  const account = getFirebaseServiceAccount();
+  if (!account) return null;
+  firebaseApp = admin.initializeApp({
+    credential: admin.credential.cert(account),
+  });
+  return firebaseApp;
 }
 
 export function isPushConfigured(): boolean {
-  return !!(getVapidPublicKey() && getVapidPrivateKey() && getVapidSubject());
-}
-
-export function getPublicVapidKey(): string | null {
-  return getVapidPublicKey() ?? null;
+  return isFcmConfigured();
 }
 
 interface PushPayload {
@@ -37,29 +26,40 @@ interface PushPayload {
   conversationId: string;
 }
 
-async function sendToSubscription(
-  subscription: { endpoint: string; p256dh: string; auth: string; id: string },
+async function sendToToken(
+  token: { token: string; id: string },
   payload: PushPayload
 ): Promise<void> {
-  if (!ensureConfigured()) return;
+  const app = getFirebaseApp();
+  if (!app) return;
 
   try {
-    await webpush.sendNotification(
-      {
-        endpoint: subscription.endpoint,
-        keys: {
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
+    await admin.messaging().send({
+      token: token.token,
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      },
+      data: {
+        url: payload.url,
+        conversationId: payload.conversationId,
+      },
+      android: {
+        priority: "high",
+        notification: {
+          sound: "default",
         },
       },
-      JSON.stringify(payload)
-    );
+    });
   } catch (err) {
-    const status = (err as { statusCode?: number }).statusCode;
-    if (status === 404 || status === 410 || status === 401 || status === 403) {
-      await prisma.pushSubscription.delete({ where: { id: subscription.id } }).catch(() => undefined);
+    const code = (err as { code?: string }).code;
+    if (
+      code === "messaging/registration-token-not-registered" ||
+      code === "messaging/invalid-registration-token"
+    ) {
+      await prisma.fcmToken.delete({ where: { id: token.id } }).catch(() => undefined);
     } else {
-      console.error("[push] send failed:", status, subscription.endpoint.slice(0, 48));
+      console.error("[fcm] send failed:", code, token.token.slice(0, 16));
     }
   }
 }
@@ -98,7 +98,7 @@ export async function notifyConversationMessage(
 
   if (userIds.length === 0 && adminIds.length === 0) return;
 
-  const subscriptions = await prisma.pushSubscription.findMany({
+  const tokens = await prisma.fcmToken.findMany({
     where: {
       OR: [
         ...(userIds.length ? [{ userId: { in: userIds } }] : []),
@@ -107,7 +107,7 @@ export async function notifyConversationMessage(
     },
   });
 
-  if (subscriptions.length === 0) return;
+  if (tokens.length === 0) return;
 
   const preview = formatLastMessagePreview({
     content: message.content,
@@ -122,7 +122,5 @@ export async function notifyConversationMessage(
     conversationId,
   };
 
-  await Promise.allSettled(
-    subscriptions.map((sub) => sendToSubscription(sub, payload))
-  );
+  await Promise.allSettled(tokens.map((entry) => sendToToken(entry, payload)));
 }

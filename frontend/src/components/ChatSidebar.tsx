@@ -18,7 +18,6 @@ import {
   getUserProfile,
 } from "../lib/storage";
 import { createChatSocket, joinInboxRooms } from "../lib/socket";
-import { showLocalNotification } from "../lib/notifications";
 import { Avatar } from "./Avatar";
 import { formatLastMessagePreview } from "./AttachmentBubble";
 
@@ -129,22 +128,9 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
         });
 
         const prevAt = lastMessageAtRef.current.get(convId);
-        if (
-          initializedRef.current &&
-          msg.createdAt !== prevAt &&
-          !isActive &&
-          !fromSelf
-        ) {
-          const title =
-            getParticipantSession(convId)?.title ?? "New message";
-          showLocalNotification(
-            title,
-            preview,
-            `/chat/${convId}`,
-            convId
-          );
+        if (msg.createdAt !== prevAt) {
+          lastMessageAtRef.current.set(convId, msg.createdAt);
         }
-        lastMessageAtRef.current.set(convId, msg.createdAt);
       }
     );
 
@@ -173,24 +159,6 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
 
           for (const chat of open) {
             const messageAt = chat.lastMessageTime;
-            const prevAt = lastMessageAtRef.current.get(chat.conversationId);
-            const isActiveChat = conversationId === chat.conversationId;
-
-            if (
-              initializedRef.current &&
-              messageAt &&
-              prevAt &&
-              messageAt !== prevAt &&
-              !isActiveChat &&
-              chat.unreadCount > 0
-            ) {
-              showLocalNotification(
-                chat.title,
-                chat.lastMessage ?? "New message",
-                `/chat/${chat.conversationId}`,
-                chat.conversationId
-              );
-            }
 
             if (messageAt) {
               lastMessageAtRef.current.set(chat.conversationId, messageAt);
@@ -239,26 +207,6 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
           });
 
           const messageAt = info.lastMessage?.createdAt;
-          const prevAt = lastMessageAtRef.current.get(session.conversationId);
-          const isActiveChat = conversationId === session.conversationId;
-
-          if (
-            initializedRef.current &&
-            messageAt &&
-            prevAt &&
-            messageAt !== prevAt &&
-            !isActiveChat &&
-            info.lastMessage &&
-            (info.unreadCount ?? 0) > 0
-          ) {
-            const preview = formatLastMessagePreview(info.lastMessage);
-            showLocalNotification(
-              info.title,
-              preview,
-              `/chat/${session.conversationId}`,
-              session.conversationId
-            );
-          }
 
           if (messageAt) {
             lastMessageAtRef.current.set(session.conversationId, messageAt);

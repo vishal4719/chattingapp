@@ -99,16 +99,44 @@ export function getLiveKitUrl(): string {
   return required("LIVEKIT_URL").replace(/\/$/, "");
 }
 
-export function getVapidPublicKey(): string | undefined {
-  return optional("VAPID_PUBLIC_KEY");
+export interface FirebaseServiceAccount {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
 }
 
-export function getVapidPrivateKey(): string | undefined {
-  return optional("VAPID_PRIVATE_KEY");
+export function getFirebaseServiceAccount(): FirebaseServiceAccount | null {
+  const json = optional("FIREBASE_SERVICE_ACCOUNT_JSON");
+  if (json) {
+    try {
+      const parsed = JSON.parse(json) as {
+        project_id?: string;
+        client_email?: string;
+        private_key?: string;
+      };
+      if (parsed.project_id && parsed.client_email && parsed.private_key) {
+        return {
+          projectId: parsed.project_id,
+          clientEmail: parsed.client_email,
+          privateKey: parsed.private_key,
+        };
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  const projectId = optional("FIREBASE_PROJECT_ID");
+  const clientEmail = optional("FIREBASE_CLIENT_EMAIL");
+  const privateKey = optional("FIREBASE_PRIVATE_KEY")?.replace(/\\n/g, "\n");
+  if (projectId && clientEmail && privateKey) {
+    return { projectId, clientEmail, privateKey };
+  }
+  return null;
 }
 
-export function getVapidSubject(): string | undefined {
-  return optional("VAPID_SUBJECT");
+export function isFcmConfigured(): boolean {
+  return getFirebaseServiceAccount() !== null;
 }
 
 export function getApiPublicUrl(): string {

@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">PandaMind</string>
     <string name="title_activity_main">PandaMind</string>
-    <string name="package_name">com.pandamind.app</string>
-    <string name="custom_url_scheme">com.pandamind.app</string>
+    <string name="package_name">com.vishal.pandamind</string>
+    <string name="custom_url_scheme">com.vishal.pandamind</string>
 </resources>

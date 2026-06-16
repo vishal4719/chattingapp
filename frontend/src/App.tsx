@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { UserProtectedRoute } from "./components/UserProtectedRoute";
 import { WhatsAppLayout } from "./components/WhatsAppLayout";
-import { NotificationsBootstrap } from "./components/NotificationsBootstrap";
+import { FcmBootstrap } from "./components/FcmBootstrap";
 import { PwaBootstrap } from "./components/PwaBootstrap";
 import { SeoManager } from "./components/SeoManager";
 import { Login } from "./pages/Login";
@@ -17,7 +17,7 @@ export default function App() {
   return (
     <>
       <PwaBootstrap />
-      <NotificationsBootstrap />
+      <FcmBootstrap />
       <SeoManager />
       <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

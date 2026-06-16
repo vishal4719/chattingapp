@@ -3,29 +3,34 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * APK ships bundled web assets (dist/) with production API URLs from .env.android.
- * Set CAPACITOR_USE_REMOTE=true to load the live site instead (needs deploy for updates).
+ * Default: load the live site (same CORS origin as the browser).
+ * Set CAPACITOR_USE_BUNDLE=true to ship web assets inside the APK.
  */
 const PRODUCTION_APP_URL = "https://chatapp.vishaltech.in";
-const useRemoteUrl = process.env.CAPACITOR_USE_REMOTE === "true";
+const useBundledAssets = process.env.CAPACITOR_USE_BUNDLE === "true";
 
 const config: CapacitorConfig = {
-  appId: "com.pandamind.app",
+  appId: "com.vishal.pandamind",
   appName: "PandaMind",
   webDir: "dist",
   android: {
     allowMixedContent: false,
   },
-  ...(useRemoteUrl
-    ? {
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
+  ...(useBundledAssets
+    ? {}
+    : {
         server: {
           url: PRODUCTION_APP_URL,
           androidScheme: "https",
           iosScheme: "https",
           cleartext: false,
         },
-      }
-    : {}),
+      }),
 };
 
 export default config;
