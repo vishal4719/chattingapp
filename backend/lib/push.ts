@@ -5,6 +5,9 @@ import { formatLastMessagePreview } from "./s3";
 
 let firebaseApp: admin.app.App | null = null;
 
+/** Must match frontend FCM_CHANNEL_ID and Android default_notification_channel_id. */
+const FCM_ANDROID_CHANNEL_ID = "pandamind_messages";
+
 function getFirebaseApp(): admin.app.App | null {
   if (firebaseApp) return firebaseApp;
   const account = getFirebaseServiceAccount();
@@ -48,6 +51,7 @@ async function sendToToken(
         priority: "high",
         notification: {
           sound: "default",
+          channelId: FCM_ANDROID_CHANNEL_ID,
         },
       },
     });
@@ -118,6 +122,63 @@ export async function notifyConversationMessage(
   const payload: PushPayload = {
     title: conversation.title,
     body: `${message.participant.displayName}: ${preview}`,
+    url: `${getFrontendUrl()}/chat/${conversationId}`,
+    conversationId,
+  };
+
+  await Promise.allSettled(tokens.map((entry) => sendToToken(entry, payload)));
+}
+
+async function getConversationRecipientTokens(
+  conversationId: string,
+  excludeParticipantId: string
+) {
+  const recipients = await prisma.participant.findMany({
+    where: {
+      conversationId,
+      leftAt: null,
+      id: { not: excludeParticipantId },
+    },
+    select: { userId: true, adminId: true },
+  });
+
+  const userIds = [...new Set(recipients.map((p) => p.userId).filter(Boolean))] as string[];
+  const adminIds = [...new Set(recipients.map((p) => p.adminId).filter(Boolean))] as string[];
+
+  if (userIds.length === 0 && adminIds.length === 0) return [];
+
+  return prisma.fcmToken.findMany({
+    where: {
+      OR: [
+        ...(userIds.length ? [{ userId: { in: userIds } }] : []),
+        ...(adminIds.length ? [{ adminId: { in: adminIds } }] : []),
+      ],
+    },
+  });
+}
+
+export async function notifyIncomingCall(
+  conversationId: string,
+  callerParticipantId: string,
+  callType: "video" | "audio",
+  callerName: string
+): Promise<void> {
+  if (!isPushConfigured()) return;
+
+  const [conversation, tokens] = await Promise.all([
+    prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { title: true },
+    }),
+    getConversationRecipientTokens(conversationId, callerParticipantId),
+  ]);
+
+  if (!conversation || tokens.length === 0) return;
+
+  const callLabel = callType === "video" ? "Video call" : "Voice call";
+  const payload: PushPayload = {
+    title: conversation.title,
+    body: `${callerName}: Incoming ${callLabel.toLowerCase()}`,
     url: `${getFrontendUrl()}/chat/${conversationId}`,
     conversationId,
   };

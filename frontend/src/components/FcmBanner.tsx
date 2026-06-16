@@ -14,11 +14,20 @@ export function FcmBanner() {
   useEffect(() => {
     if (!isNativeApp()) return;
 
-    isFcmEnabled().then((enabled) => {
-      if (enabled) return;
-      if (localStorage.getItem("fcm-banner-dismissed") === "1") return;
-      setVisible(true);
-    });
+    function refreshBanner() {
+      isFcmEnabled().then((enabled) => {
+        if (enabled) {
+          setVisible(false);
+          return;
+        }
+        if (localStorage.getItem("fcm-banner-dismissed") === "1") return;
+        setVisible(true);
+      });
+    }
+
+    refreshBanner();
+    window.addEventListener("pandamind:auth-changed", refreshBanner);
+    return () => window.removeEventListener("pandamind:auth-changed", refreshBanner);
   }, []);
 
   if (!isNativeApp() || !visible) return null;

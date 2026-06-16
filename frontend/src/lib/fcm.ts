@@ -7,6 +7,9 @@ import {
 } from "@capacitor/push-notifications";
 import { api } from "./api";
 
+/** Must match backend FCM android.notification.channelId and AndroidManifest default channel. */
+export const FCM_CHANNEL_ID = "pandamind_messages";
+
 export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform();
 }
@@ -35,6 +38,24 @@ function navigateFromNotification(data?: Record<string, string>) {
     }
   } catch {
     // ignore malformed URLs
+  }
+}
+
+async function ensureAndroidNotificationChannel(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+  try {
+    await PushNotifications.createChannel({
+      id: FCM_CHANNEL_ID,
+      name: "Messages & calls",
+      description: "New messages and incoming calls",
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+      lights: true,
+      sound: "default",
+    });
+  } catch (err) {
+    console.error("[fcm] createChannel failed:", err);
   }
 }
 
@@ -97,6 +118,8 @@ export async function initFcm(): Promise<void> {
 
   if (status.receive !== "granted") return;
 
+  await ensureAndroidNotificationChannel();
+
   try {
     const { enabled } = await api.getPushConfig();
     if (!enabled) return;
@@ -118,6 +141,8 @@ export async function enableFcm(): Promise<boolean> {
     status = await PushNotifications.requestPermissions();
   }
   if (status.receive !== "granted") return false;
+
+  await ensureAndroidNotificationChannel();
 
   try {
     const { enabled } = await api.getPushConfig();

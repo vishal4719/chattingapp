@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { saveUserSession } from "../lib/storage";
 import { PasswordInput } from "../components/PasswordInput";
+import { initFcm } from "../lib/fcm";
 
 export function UserRegister() {
   const navigate = useNavigate();
@@ -29,6 +30,8 @@ export function UserRegister() {
         password,
       });
       saveUserSession(token, user);
+      window.dispatchEvent(new Event("pandamind:auth-changed"));
+      void initFcm();
       navigate(redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");

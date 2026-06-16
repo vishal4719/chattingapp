@@ -8,6 +8,7 @@ import {
 } from "../lib/storage";
 import { PasswordInput } from "../components/PasswordInput";
 import { AppLogo } from "../components/AppLogo";
+import { initFcm } from "../lib/fcm";
 
 export function Login() {
   const navigate = useNavigate();
@@ -31,6 +32,8 @@ export function Login() {
         localStorage.removeItem("adminUser");
         saveUserSession(token, user);
         await syncUserConversations();
+        window.dispatchEvent(new Event("pandamind:auth-changed"));
+        void initFcm();
         navigate(redirect);
         return;
       } catch (userErr) {
@@ -45,6 +48,8 @@ export function Login() {
       localStorage.setItem("adminToken", token);
       localStorage.setItem("adminUser", JSON.stringify(admin));
       await syncAdminConversations();
+      window.dispatchEvent(new Event("pandamind:auth-changed"));
+      void initFcm();
       navigate("/admin-dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

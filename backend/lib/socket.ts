@@ -12,6 +12,7 @@ import {
   type MessageStatus,
 } from "./receipts";
 import { persistTextMessage } from "./send-message";
+import { notifyIncomingCall } from "./push";
 
 const sendMessageSchema = z.object({
   conversationId: z.string().min(1),
@@ -297,6 +298,13 @@ export function initSocket(server: HTTPServer): SocketIOServer {
           callerId: participantId,
           callerName: displayName,
         });
+
+        void notifyIncomingCall(
+          data.conversationId,
+          participantId,
+          data.callType,
+          displayName
+        );
       }
     );
 
