@@ -73,6 +73,17 @@
     </script>
   </head>
   <body>
+    <script>
+      (function () {
+        if (typeof window.Notification !== "undefined") return;
+        window.Notification = {
+          permission: "denied",
+          requestPermission: function () {
+            return Promise.resolve("denied");
+          },
+        };
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

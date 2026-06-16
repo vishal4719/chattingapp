@@ -7,6 +7,18 @@ import "./index.css";
 
 if (Capacitor.isNativePlatform()) {
   document.documentElement.classList.add("native-app");
+
+  // Android WebView has no Notification API — avoid crashes from any code path.
+  if (typeof window !== "undefined" && !("Notification" in window)) {
+    const stub = {
+      permission: "denied" as NotificationPermission,
+      requestPermission: async () => "denied" as const,
+    };
+    Object.defineProperty(window, "Notification", {
+      value: stub,
+      configurable: true,
+    });
+  }
 }
 
 createRoot(document.getElementById("root")!).render(

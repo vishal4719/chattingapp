@@ -1,10 +1,13 @@
+/// <reference types="node" />
+
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * The Android/iOS app loads the live website in a native shell.
- * Same origin as the browser → same API calls, same CORS, no localhost mess.
+ * APK ships bundled web assets (dist/) with production API URLs from .env.android.
+ * Set CAPACITOR_USE_REMOTE=true to load the live site instead (needs deploy for updates).
  */
 const PRODUCTION_APP_URL = "https://chatapp.vishaltech.in";
+const useRemoteUrl = process.env.CAPACITOR_USE_REMOTE === "true";
 
 const config: CapacitorConfig = {
   appId: "com.pandamind.app",
@@ -13,12 +16,16 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
   },
-  server: {
-    url: PRODUCTION_APP_URL,
-    androidScheme: "https",
-    iosScheme: "https",
-    cleartext: false,
-  },
+  ...(useRemoteUrl
+    ? {
+        server: {
+          url: PRODUCTION_APP_URL,
+          androidScheme: "https",
+          iosScheme: "https",
+          cleartext: false,
+        },
+      }
+    : {}),
 };
 
 export default config;

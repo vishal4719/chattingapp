@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { api } from "./api";
 import { getServiceWorkerRegistration } from "./pwa";
 
@@ -21,9 +22,17 @@ export function notificationsSupported(): boolean {
   );
 }
 
-export function getNotificationPermission(): NotificationPermission | "unsupported" {
+function safeNotificationPermission(): NotificationPermission | "unsupported" {
   if (!notificationsSupported()) return "unsupported";
   return Notification.permission;
+}
+
+export function isNativeApp(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+export function getNotificationPermission(): NotificationPermission | "unsupported" {
+  return safeNotificationPermission();
 }
 
 export async function requestNotificationPermission(): Promise<NotificationPermission | "unsupported"> {
@@ -39,7 +48,7 @@ export function showLocalNotification(
   url?: string,
   conversationId?: string
 ): void {
-  if (!notificationsSupported() || Notification.permission !== "granted") {
+  if (!notificationsSupported() || safeNotificationPermission() !== "granted") {
     return;
   }
 
@@ -119,7 +128,7 @@ export async function initNotifications(): Promise<void> {
     localStorage.getItem("userToken") || localStorage.getItem("adminToken");
   if (!hasAuth || !notificationsSupported()) return;
 
-  if (Notification.permission !== "granted") return;
+  if (safeNotificationPermission() !== "granted") return;
 
   try {
     await registerPushSubscription();
@@ -146,7 +155,7 @@ export function getNotificationUnsupportedReason(): string | null {
   if (!("Notification" in window)) return "This browser does not support notifications.";
   if (!("serviceWorker" in navigator)) return "Notifications require a supported browser (Chrome recommended).";
   if (!("PushManager" in window)) return "Push notifications are not available in this browser or app.";
-  if (Notification.permission === "denied") {
+  if (safeNotificationPermission() === "denied") {
     return "Notifications are blocked. Enable them in your browser or phone settings.";
   }
   return null;

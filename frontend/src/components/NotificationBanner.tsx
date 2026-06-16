@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import {
   enableNotifications,
+  getNotificationPermission,
   getNotificationUnsupportedReason,
+  isNativeApp,
   notificationsSupported,
 } from "../lib/notifications";
 
@@ -11,20 +13,22 @@ export function NotificationBanner() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (isNativeApp() || !notificationsSupported()) return;
+
+    const permission = getNotificationPermission();
     const unsupported = getNotificationUnsupportedReason();
-    if (unsupported) {
-      if (Notification.permission === "denied") {
-        setError(unsupported);
-        setVisible(true);
-      }
+
+    if (unsupported && permission === "denied") {
+      setError(unsupported);
+      setVisible(true);
       return;
     }
-    if (!notificationsSupported()) return;
+
     if (localStorage.getItem("notifications-banner-dismissed") === "1") return;
-    setVisible(Notification.permission === "default");
+    setVisible(permission === "default");
   }, []);
 
-  if (!visible) return null;
+  if (isNativeApp() || !notificationsSupported() || !visible) return null;
 
   async function handleEnable() {
     setLoading(true);
@@ -52,7 +56,7 @@ export function NotificationBanner() {
     setVisible(false);
   }
 
-  const isBlocked = Notification.permission === "denied";
+  const isBlocked = getNotificationPermission() === "denied";
 
   return (
     <div className="shrink-0 px-3 py-2 bg-[var(--wa-green)]/15 border-b border-[var(--wa-green)]/30 flex items-center gap-3 text-sm">

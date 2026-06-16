@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { initNotifications } from "../lib/notifications";
+import { initNotifications, isNativeApp } from "../lib/notifications";
 
 export function NotificationsBootstrap() {
   useEffect(() => {
+    if (isNativeApp()) return;
     initNotifications().catch(() => undefined);
   }, []);
 

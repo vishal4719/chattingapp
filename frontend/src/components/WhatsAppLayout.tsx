@@ -2,13 +2,14 @@ import { Outlet, useParams } from "react-router-dom";
 import { ChatSidebar } from "./ChatSidebar";
 import { NotificationBanner } from "./NotificationBanner";
 import { InstallBanner } from "./InstallBanner";
+import { isNativeApp } from "../lib/notifications";
 
 export function WhatsAppLayout() {
   const { conversationId } = useParams();
 
   return (
     <div className="app-shell flex flex-col bg-[var(--wa-bg)] overflow-hidden">
-      <InstallBanner />
+      {!isNativeApp() && <InstallBanner />}
       <NotificationBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden w-full">
       <div

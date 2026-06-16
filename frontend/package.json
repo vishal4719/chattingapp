@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:android": "npm run build && npx cap sync android",
+    "build:android": "tsc -b && vite build --mode android && npx cap sync android",
     "build:ios": "tsc -b && vite build --mode android && npx cap sync ios",
     "android:open": "bash scripts/android-java.sh npx cap open android",
     "android:run": "bash scripts/android-java.sh bash -c 'npm run build:android && npx cap run android'",
-    "android:apk": "bash scripts/android-java.sh bash -c 'cd android && ./gradlew assembleDebug && mkdir -p ../public/downloads && cp app/build/outputs/apk/debug/app-debug.apk ../public/downloads/pandamind.apk'",
+    "android:run:remote": "bash scripts/android-java.sh bash -c 'CAPACITOR_USE_REMOTE=true npm run build:android && CAPACITOR_USE_REMOTE=true npx cap run android'",
+    "android:apk": "bash scripts/android-java.sh bash -c 'npm run build:android && cd android && ./gradlew assembleDebug && mkdir -p ../public/downloads && cp app/build/outputs/apk/debug/app-debug.apk ../public/downloads/pandamind.apk'",
     "android:devices": "bash scripts/android-adb.sh devices",
     "android:logs": "bash scripts/android-logs.sh",
     "android:run:device": "bash scripts/android-java.sh bash -c 'npm run build:android && npx cap run android --target'",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.4.0",
     "@tailwindcss/vite": "^4.1.8",
+    "@types/node": "^25.9.3",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.5.1",
