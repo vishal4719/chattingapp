@@ -177,7 +177,7 @@ export function Dashboard() {
   const openChats = conversations.filter((c) => !c.destroyedAt);
 
   return (
-    <div className="h-dvh max-h-dvh flex flex-col overflow-hidden bg-[var(--wa-bg)]">
+    <div className="app-shell flex flex-col overflow-hidden bg-[var(--wa-bg)]">
       <NotificationBanner />
       <header className="h-[60px] shrink-0 px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] z-10">
         <div className="flex items-center gap-3">

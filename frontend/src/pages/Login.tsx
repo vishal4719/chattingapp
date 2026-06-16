@@ -45,7 +45,7 @@ export function Login() {
       localStorage.setItem("adminToken", token);
       localStorage.setItem("adminUser", JSON.stringify(admin));
       await syncAdminConversations();
-      navigate("/dashboard");
+      navigate("/admin-dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
