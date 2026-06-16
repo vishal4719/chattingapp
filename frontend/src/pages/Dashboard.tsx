@@ -179,7 +179,7 @@ export function Dashboard() {
   return (
     <div className="app-shell flex flex-col overflow-hidden bg-[var(--wa-bg)]">
       <FcmBanner />
-      <header className="h-[60px] shrink-0 px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] z-10">
+      <header className="h-[52px] shrink-0 px-3 md:px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] z-10">
         <div className="flex items-center gap-3">
           <Avatar name={adminUser.name ?? "Admin"} size="sm" />
           <div>
@@ -206,9 +206,9 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto wa-scrollbar max-w-3xl w-full mx-auto px-4 py-6 pb-8 space-y-4">
-        <section className="rounded-lg bg-[var(--wa-panel)] border border-[var(--wa-border)] p-4">
-          <h2 className="text-sm text-[var(--wa-green)] uppercase mb-3">
+      <main className="flex-1 min-h-0 overflow-y-auto wa-scrollbar max-w-3xl w-full mx-auto px-3 md:px-4 py-3 md:py-6 pb-4 md:pb-8 space-y-3 md:space-y-4">
+        <section className="rounded-lg bg-[var(--wa-panel)] border border-[var(--wa-border)] p-3 md:p-4">
+          <h2 className="text-sm text-[var(--wa-green)] uppercase mb-2 md:mb-3">
             New group
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -268,7 +268,7 @@ export function Dashboard() {
                     key={conv.id}
                     className="rounded-lg bg-[var(--wa-panel)] border border-[var(--wa-border)] overflow-hidden"
                   >
-                    <div className="flex items-center gap-3 p-3">
+                    <div className="flex items-center gap-3 p-2.5 md:p-3">
                       <Avatar name={conv.title} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="font-normal text-[17px] truncate">{conv.title}</p>
@@ -281,7 +281,7 @@ export function Dashboard() {
                     </div>
 
                     {isOpen && (
-                      <div className="flex flex-wrap gap-2 px-3 pb-3 border-t border-[var(--wa-border)] pt-3">
+                      <div className="flex flex-wrap gap-2 px-2.5 md:px-3 pb-2.5 md:pb-3 border-t border-[var(--wa-border)] pt-2.5 md:pt-3">
                         <button
                           onClick={() => handleOpenChat(conv)}
                           className="text-sm px-3 py-1.5 rounded-lg bg-[var(--wa-green)] text-white hover:bg-[#06cf9c]"

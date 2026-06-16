@@ -28,6 +28,7 @@ html.native-app #root {
   height: 100vh;
   min-height: 100vh;
   max-height: 100vh;
+  padding-top: 0 !important;
 }
 
 .app-shell {
@@ -40,6 +41,7 @@ html.native-app .app-shell {
   height: 100vh;
   min-height: 100vh;
   max-height: 100vh;
+  padding-top: 0 !important;
 }
 
 body {

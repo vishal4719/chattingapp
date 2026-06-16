@@ -20,6 +20,9 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true,
     },
+    SystemBars: {
+      insetsHandling: "disable",
+    },
   },
   ...(useBundledAssets
     ? {}
