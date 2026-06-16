@@ -768,7 +768,7 @@ export function Chat() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full w-full overflow-hidden">
-      <header className="max-md:fixed max-md:top-0 max-md:left-0 max-md:right-0 max-md:z-40 h-[60px] px-2 md:px-4 flex items-center gap-2 bg-[var(--wa-header)] shrink-0 border-b border-[var(--wa-border)] z-30">
+      <header className="native-chat-header max-md:fixed max-md:left-0 max-md:right-0 max-md:z-40 h-[52px] px-2 md:px-4 flex items-center gap-2 bg-[var(--wa-header)] shrink-0 border-b border-[var(--wa-border)] z-30 md:static">
         <Link
           to="/dashboard"
           className="md:hidden p-2 text-[var(--wa-text-secondary)]"

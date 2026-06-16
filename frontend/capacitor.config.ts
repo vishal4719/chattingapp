@@ -21,7 +21,7 @@ const config: CapacitorConfig = {
       enabled: true,
     },
     SystemBars: {
-      insetsHandling: "disable",
+      insetsHandling: "css",
     },
   },
   ...(useBundledAssets

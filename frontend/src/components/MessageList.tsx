@@ -43,7 +43,7 @@ export function MessageList({
   return (
     <div
       ref={scrollRef}
-      className={`flex-1 min-h-0 overflow-y-auto wa-scrollbar wa-chat-bg px-[6%] py-3 max-md:pt-[72px] space-y-0.5 ${className}`}
+      className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden wa-scrollbar wa-chat-bg px-3 sm:px-[6%] py-2 native-chat-messages md:!pt-3 space-y-0.5 ${className}`}
     >
       {items.length === 0 && (
         <div className="flex items-center justify-center h-full">
@@ -89,7 +89,7 @@ export function MessageList({
         return (
           <div
             key={item.id}
-            className={`group flex ${isOwn ? "justify-end" : "justify-start"} ${
+            className={`group flex w-full min-w-0 ${isOwn ? "justify-end pr-0.5" : "justify-start pl-0.5"} ${
               showAvatar ? "mt-2" : "mt-0.5"
             }`}
           >
@@ -105,7 +105,7 @@ export function MessageList({
               message={item}
               isOwn={isOwn}
               onReply={onReply}
-              className={`max-w-[65%] ${onReply ? "group/msg" : ""}`}
+              className={`max-w-[min(82vw,65%)] min-w-0 ${onReply ? "group/msg" : ""}`}
             >
               {onReply && (
                 <button
@@ -122,7 +122,7 @@ export function MessageList({
                 </button>
               )}
               <div
-                className={`relative px-2 py-1.5 pb-2 shadow-sm ${
+                className={`relative px-2 py-1 shadow-sm min-w-0 ${
                   isOwn
                     ? "bg-[var(--wa-green-dark)] rounded-lg rounded-tr-none"
                     : "bg-[var(--wa-incoming)] rounded-lg rounded-tl-none"
@@ -146,11 +146,11 @@ export function MessageList({
                   participantToken={participantToken}
                 />
               ) : (
-                <p className="text-[14.2px] leading-[19px] break-words whitespace-pre-wrap px-1 text-[#e9edef]">
+                <p className="text-[14.2px] leading-[19px] break-words whitespace-pre-wrap px-0.5 text-[#e9edef]">
                   {item.content}
                 </p>
               )}
-              <div className="flex items-center justify-end gap-0.5 mt-0.5 px-1 -mb-0.5">
+              <div className="flex items-center justify-end gap-0.5 mt-0.5 px-0.5">
                 <span className="text-[11px] text-[var(--wa-text-secondary)]">
                   {formatMessageTime(item.createdAt)}
                 </span>

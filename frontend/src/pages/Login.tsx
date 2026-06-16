@@ -54,7 +54,7 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[var(--wa-bg)]">
+    <div className="native-page min-h-screen flex items-center justify-center p-4 bg-[var(--wa-bg)]">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <AppLogo size={88} className="mx-auto mb-4" />
