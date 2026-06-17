@@ -46,12 +46,32 @@ async function sendToToken(
       data: {
         url: payload.url,
         conversationId: payload.conversationId,
+        title: payload.title,
+        body: payload.body,
       },
       android: {
         priority: "high",
         notification: {
           sound: "default",
           channelId: FCM_ANDROID_CHANNEL_ID,
+          priority: "high",
+          defaultVibrateTimings: true,
+          defaultSound: true,
+        },
+      },
+      apns: {
+        headers: {
+          "apns-priority": "10",
+        },
+        payload: {
+          aps: {
+            alert: {
+              title: payload.title,
+              body: payload.body,
+            },
+            sound: "default",
+            badge: 1,
+          },
         },
       },
     });

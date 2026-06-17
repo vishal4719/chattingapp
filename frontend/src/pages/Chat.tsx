@@ -30,6 +30,7 @@ import { getPollIntervalMs } from "../lib/env";
 import { ApiError } from "../lib/api";
 import { formatTypingText } from "../lib/typing";
 import { buildCallEventText, notifyAppRefresh, type CallLeaveSummary } from "../lib/callSummary";
+import { setActiveConversationId } from "../lib/notification-focus";
 import { downloadAdminChatExport } from "../lib/exportChat";
 import { formatLastMessagePreview } from "../components/AttachmentBubble";
 import { MessageList } from "../components/MessageList";
@@ -100,6 +101,11 @@ export function Chat() {
   const resetCallStateRef = useRef<() => void>(() => undefined);
   const socketRef = useRef<Socket | null>(null);
   const isAdmin = localStorage.getItem("adminToken") !== null;
+
+  useEffect(() => {
+    setActiveConversationId(conversationId ?? null);
+    return () => setActiveConversationId(null);
+  }, [conversationId]);
 
   const resetCallState = useCallback(() => {
     setCallState("idle");

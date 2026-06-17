@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import {
   ActionPerformed,
   PushNotifications,
@@ -6,9 +7,12 @@ import {
   type Token,
 } from "@capacitor/push-notifications";
 import { api } from "./api";
+import { shouldSuppressMessageAlert } from "./notification-focus";
 
 /** Must match backend FCM android.notification.channelId and AndroidManifest default channel. */
 export const FCM_CHANNEL_ID = "pandamind_messages";
+
+const FCM_DEVICE_TOKEN_KEY = "fcm-device-token";
 
 export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform();
@@ -24,6 +28,37 @@ async function saveFcmToken(token: string): Promise<void> {
   localStorage.setItem("fcm-enabled", "1");
   registrationWaiter?.(true);
   registrationWaiter = null;
+}
+
+async function persistDeviceToken(token: string): Promise<boolean> {
+  localStorage.setItem(FCM_DEVICE_TOKEN_KEY, token);
+  try {
+    await saveFcmToken(token);
+    return true;
+  } catch (err) {
+    console.error("[fcm] failed to save token on server:", err);
+    registrationWaiter?.(false);
+    registrationWaiter = null;
+    return false;
+  }
+}
+
+async function syncCachedTokenWithBackend(): Promise<boolean> {
+  const cached = localStorage.getItem(FCM_DEVICE_TOKEN_KEY);
+  if (!cached) return false;
+
+  const hasAuth =
+    localStorage.getItem("userToken") || localStorage.getItem("adminToken");
+  if (!hasAuth) return false;
+
+  try {
+    const { enabled } = await api.getPushConfig();
+    if (!enabled) return false;
+  } catch {
+    return false;
+  }
+
+  return persistDeviceToken(cached);
 }
 
 function navigateFromNotification(data?: Record<string, string>) {
@@ -59,17 +94,51 @@ async function ensureAndroidNotificationChannel(): Promise<void> {
   }
 }
 
+async function ensureLocalNotificationPermission(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    const status = await LocalNotifications.checkPermissions();
+    if (status.display === "prompt" || status.display === "prompt-with-rationale") {
+      await LocalNotifications.requestPermissions();
+    }
+  } catch (err) {
+    console.error("[fcm] local notification permission failed:", err);
+  }
+}
+
+async function showForegroundNotification(
+  notification: PushNotificationSchema
+): Promise<void> {
+  const data = notification.data as Record<string, string> | undefined;
+  const conversationId = data?.conversationId;
+  if (conversationId && shouldSuppressMessageAlert(conversationId)) return;
+
+  const title = notification.title ?? "New message";
+  const body = notification.body ?? "";
+
+  try {
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: (Date.now() % 2_000_000_000) + 1,
+          title,
+          body,
+          channelId: FCM_CHANNEL_ID,
+          extra: data,
+        },
+      ],
+    });
+  } catch (err) {
+    console.error("[fcm] foreground local notification failed:", err);
+  }
+}
+
 function attachPushListeners(): void {
   if (listenersAttached) return;
   listenersAttached = true;
 
   PushNotifications.addListener("registration", async (token: Token) => {
-    try {
-      await saveFcmToken(token.value);
-    } catch {
-      registrationWaiter?.(false);
-      registrationWaiter = null;
-    }
+    await persistDeviceToken(token.value);
   });
 
   PushNotifications.addListener("registrationError", (err) => {
@@ -89,15 +158,37 @@ function attachPushListeners(): void {
     "pushNotificationReceived",
     (notification: PushNotificationSchema) => {
       if (document.visibilityState === "visible") {
-        navigateFromNotification(notification.data as Record<string, string>);
+        void showForegroundNotification(notification);
       }
     }
   );
+
+  void LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
+    navigateFromNotification(action.notification.extra as Record<string, string>);
+  });
 }
 
 async function hasPushPermission(): Promise<boolean> {
   const status = await PushNotifications.checkPermissions();
   return status.receive === "granted";
+}
+
+async function registerForPushIfReady(): Promise<void> {
+  attachPushListeners();
+  await ensureAndroidNotificationChannel();
+  await ensureLocalNotificationPermission();
+
+  const synced = await syncCachedTokenWithBackend();
+  if (synced) return;
+
+  try {
+    const { enabled } = await api.getPushConfig();
+    if (!enabled) return;
+  } catch {
+    return;
+  }
+
+  await PushNotifications.register();
 }
 
 export async function initFcm(): Promise<void> {
@@ -118,16 +209,7 @@ export async function initFcm(): Promise<void> {
 
   if (status.receive !== "granted") return;
 
-  await ensureAndroidNotificationChannel();
-
-  try {
-    const { enabled } = await api.getPushConfig();
-    if (!enabled) return;
-  } catch {
-    return;
-  }
-
-  await PushNotifications.register();
+  await registerForPushIfReady();
 }
 
 export async function enableFcm(): Promise<boolean> {
@@ -143,11 +225,14 @@ export async function enableFcm(): Promise<boolean> {
   if (status.receive !== "granted") return false;
 
   await ensureAndroidNotificationChannel();
+  await ensureLocalNotificationPermission();
+
+  const alreadySynced = await syncCachedTokenWithBackend();
+  if (alreadySynced) return true;
 
   try {
     const { enabled } = await api.getPushConfig();
     if (!enabled) {
-      // Permission granted; token will register once backend FCM env is set.
       await PushNotifications.register();
       return false;
     }

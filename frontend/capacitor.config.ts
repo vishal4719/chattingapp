@@ -23,6 +23,13 @@ const config: CapacitorConfig = {
     SystemBars: {
       insetsHandling: "css",
     },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
+    LocalNotifications: {
+      iconColor: "#25D366",
+      sound: "default",
+    },
   },
   ...(useBundledAssets
     ? {}

@@ -1,5 +1,6 @@
 import { Outlet, useParams } from "react-router-dom";
 import { ChatSidebar } from "./ChatSidebar";
+import { BrowserNotificationBanner } from "./BrowserNotificationBanner";
 import { FcmBanner } from "./FcmBanner";
 import { InstallBanner } from "./InstallBanner";
 import { isNativeApp } from "../lib/fcm";
@@ -10,6 +11,7 @@ export function WhatsAppLayout() {
   return (
     <div className="app-shell flex flex-col bg-[var(--wa-bg)] overflow-hidden">
       {!isNativeApp() && <InstallBanner />}
+      {!isNativeApp() && <BrowserNotificationBanner />}
       <FcmBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden w-full">
       <div

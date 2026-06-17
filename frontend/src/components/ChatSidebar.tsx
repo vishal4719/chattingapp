@@ -18,6 +18,7 @@ import {
   getUserProfile,
 } from "../lib/storage";
 import { createChatSocket, joinInboxRooms } from "../lib/socket";
+import { showBrowserMessageNotification } from "../lib/browser-notifications";
 import { Avatar } from "./Avatar";
 import { formatLastMessagePreview } from "./AttachmentBubble";
 
@@ -62,11 +63,16 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
   const conversationIdRef = useRef(conversationId);
   const socketRef = useRef<Socket | null>(null);
   const loadRef = useRef<(() => void) | null>(null);
+  const chatsRef = useRef<SidebarChat[]>([]);
   const isAdmin = localStorage.getItem("adminToken") !== null;
   const adminUser = JSON.parse(localStorage.getItem("adminUser") ?? "{}");
   const userProfile = getUserProfile();
 
   conversationIdRef.current = conversationId;
+
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -130,6 +136,18 @@ export function ChatSidebar({ onChatsLoaded }: Props) {
         const prevAt = lastMessageAtRef.current.get(convId);
         if (msg.createdAt !== prevAt) {
           lastMessageAtRef.current.set(convId, msg.createdAt);
+        }
+
+        if (!fromSelf && (!isActive || document.visibilityState !== "visible")) {
+          const chatTitle =
+            chatsRef.current.find((c) => c.conversationId === convId)?.title ??
+            "New message";
+          showBrowserMessageNotification({
+            conversationId: convId,
+            title: chatTitle,
+            body: `${msg.participant.displayName}: ${preview}`,
+            url: `/chat/${convId}`,
+          });
         }
       }
     );

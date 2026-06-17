@@ -4,6 +4,7 @@ import { api, Conversation, ConversationDetail } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { AdminSettings } from "../components/AdminSettings";
 import { FcmBanner } from "../components/FcmBanner";
+import { BrowserNotificationBanner } from "../components/BrowserNotificationBanner";
 import { saveParticipantSession } from "../lib/storage";
 import { downloadAdminChatExport } from "../lib/exportChat";
 
@@ -179,6 +180,7 @@ export function Dashboard() {
   return (
     <div className="app-shell flex flex-col overflow-hidden bg-[var(--wa-bg)]">
       <FcmBanner />
+      <BrowserNotificationBanner />
       <header className="h-[52px] shrink-0 px-3 md:px-4 flex items-center justify-between bg-[var(--wa-header)] border-b border-[var(--wa-border)] z-10">
         <div className="flex items-center gap-3">
           <Avatar name={adminUser.name ?? "Admin"} size="sm" />
