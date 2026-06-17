@@ -13,13 +13,40 @@ function getFirebaseApp(): admin.app.App | null {
   const account = getFirebaseServiceAccount();
   if (!account) return null;
   firebaseApp = admin.initializeApp({
-    credential: admin.credential.cert(account),
+    credential: admin.credential.cert({
+      projectId: account.projectId,
+      clientEmail: account.clientEmail,
+      privateKey: account.privateKey,
+    }),
+    projectId: account.projectId,
   });
   return firebaseApp;
 }
 
 export function isPushConfigured(): boolean {
   return isFcmConfigured();
+}
+
+export function getPushProjectId(): string | null {
+  return getFirebaseServiceAccount()?.projectId ?? null;
+}
+
+export async function getAccountPushTokens(params: {
+  userId?: string;
+  adminId?: string;
+}) {
+  if (!params.userId && !params.adminId) return [];
+
+  return prisma.fcmToken.findMany({
+    where: {
+      OR: [
+        ...(params.userId ? [{ userId: params.userId }] : []),
+        ...(params.adminId ? [{ adminId: params.adminId }] : []),
+      ],
+    },
+    select: { id: true, token: true, platform: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+  });
 }
 
 interface PushPayload {
@@ -32,9 +59,9 @@ interface PushPayload {
 async function sendToToken(
   token: { token: string; id: string },
   payload: PushPayload
-): Promise<void> {
+): Promise<boolean> {
   const app = getFirebaseApp();
-  if (!app) return;
+  if (!app) return false;
 
   try {
     await admin.messaging().send({
@@ -75,6 +102,7 @@ async function sendToToken(
         },
       },
     });
+    return true;
   } catch (err) {
     const code = (err as { code?: string }).code;
     if (
@@ -85,6 +113,7 @@ async function sendToToken(
     } else {
       console.error("[fcm] send failed:", code, token.token.slice(0, 16));
     }
+    return false;
   }
 }
 
@@ -131,7 +160,14 @@ export async function notifyConversationMessage(
     },
   });
 
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    console.warn("[fcm] no device tokens for conversation recipients", {
+      conversationId,
+      userIds,
+      adminIds,
+    });
+    return;
+  }
 
   const preview = formatLastMessagePreview({
     content: message.content,
@@ -147,6 +183,34 @@ export async function notifyConversationMessage(
   };
 
   await Promise.allSettled(tokens.map((entry) => sendToToken(entry, payload)));
+}
+
+export async function sendTestPush(params: {
+  userId?: string;
+  adminId?: string;
+}): Promise<{ sent: number; failed: number }> {
+  if (!isPushConfigured()) {
+    throw new Error("Push notifications are not configured");
+  }
+
+  const tokens = await getAccountPushTokens(params);
+  if (tokens.length === 0) {
+    throw new Error("No device token registered for this account");
+  }
+
+  const payload: PushPayload = {
+    title: "PandaMind",
+    body: "Notifications are working on this device.",
+    url: `${getFrontendUrl()}/dashboard`,
+    conversationId: "test",
+  };
+
+  const results = await Promise.all(tokens.map((entry) => sendToToken(entry, payload)));
+
+  return {
+    sent: results.filter(Boolean).length,
+    failed: results.filter((ok) => !ok).length,
+  };
 }
 
 async function getConversationRecipientTokens(

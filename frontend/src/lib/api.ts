@@ -432,7 +432,25 @@ export const api = {
     ),
 
   getPushConfig: () =>
-    request<{ enabled: boolean; provider: string }>("/api/push/config"),
+    request<{ enabled: boolean; provider: string; firebaseProjectId?: string | null; expectedAndroidProjectId?: string }>(
+      "/api/push/config"
+    ),
+
+  getPushStatus: () =>
+    request<{
+      configured: boolean;
+      registered: boolean;
+      tokenCount: number;
+      firebaseProjectId: string | null;
+      expectedAndroidProjectId: string;
+      platforms: string[];
+      lastUpdatedAt: string | null;
+    }>("/api/push/status"),
+
+  sendTestPush: () =>
+    request<{ ok: boolean; sent: number; failed: number }>("/api/push/test", {
+      method: "POST",
+    }),
 
   registerFcmToken: (payload: { token: string; platform: "android" | "ios" }) =>
     request<{ ok: boolean }>("/api/push/subscribe", {

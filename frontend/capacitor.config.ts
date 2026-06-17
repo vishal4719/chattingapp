@@ -3,11 +3,11 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Default: load the live site (same CORS origin as the browser).
- * Set CAPACITOR_USE_BUNDLE=true to ship web assets inside the APK.
+ * Default: bundle web assets inside the APK so push/FCM code ships with the app.
+ * Set CAPACITOR_USE_REMOTE=true to load the live site instead.
  */
 const PRODUCTION_APP_URL = "https://chatapp.vishaltech.in";
-const useBundledAssets = process.env.CAPACITOR_USE_BUNDLE === "true";
+const useRemoteServer = process.env.CAPACITOR_USE_REMOTE === "true";
 
 const config: CapacitorConfig = {
   appId: "com.vishal.pandamind",
@@ -31,16 +31,16 @@ const config: CapacitorConfig = {
       sound: "default",
     },
   },
-  ...(useBundledAssets
-    ? {}
-    : {
+  ...(useRemoteServer
+    ? {
         server: {
           url: PRODUCTION_APP_URL,
           androidScheme: "https",
           iosScheme: "https",
           cleartext: false,
         },
-      }),
+      }
+    : {}),
 };
 
 export default config;

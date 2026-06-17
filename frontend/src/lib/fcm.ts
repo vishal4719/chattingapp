@@ -14,6 +14,17 @@ export const FCM_CHANNEL_ID = "pandamind_messages";
 
 const FCM_DEVICE_TOKEN_KEY = "fcm-device-token";
 
+export interface PushRegistrationStatus {
+  configured: boolean;
+  registered: boolean;
+  tokenCount: number;
+  firebaseProjectId: string | null;
+  expectedAndroidProjectId: string;
+  projectMatches: boolean;
+  platforms: string[];
+  lastUpdatedAt: string | null;
+}
+
 export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform();
 }
@@ -37,9 +48,24 @@ async function persistDeviceToken(token: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error("[fcm] failed to save token on server:", err);
+    localStorage.removeItem("fcm-enabled");
     registrationWaiter?.(false);
     registrationWaiter = null;
     return false;
+  }
+}
+
+export async function getPushRegistrationStatus(): Promise<PushRegistrationStatus | null> {
+  try {
+    const status = await api.getPushStatus();
+    return {
+      ...status,
+      projectMatches:
+        !!status.firebaseProjectId &&
+        status.firebaseProjectId === status.expectedAndroidProjectId,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -113,8 +139,8 @@ async function showForegroundNotification(
   const conversationId = data?.conversationId;
   if (conversationId && shouldSuppressMessageAlert(conversationId)) return;
 
-  const title = notification.title ?? "New message";
-  const body = notification.body ?? "";
+  const title = notification.title ?? data?.title ?? "New message";
+  const body = notification.body ?? data?.body ?? "";
 
   try {
     await LocalNotifications.schedule({
@@ -143,6 +169,7 @@ function attachPushListeners(): void {
 
   PushNotifications.addListener("registrationError", (err) => {
     console.error("[fcm] registration failed:", err);
+    localStorage.removeItem("fcm-enabled");
     registrationWaiter?.(false);
     registrationWaiter = null;
   });
@@ -157,9 +184,7 @@ function attachPushListeners(): void {
   PushNotifications.addListener(
     "pushNotificationReceived",
     (notification: PushNotificationSchema) => {
-      if (document.visibilityState === "visible") {
-        void showForegroundNotification(notification);
-      }
+      void showForegroundNotification(notification);
     }
   );
 
@@ -178,8 +203,7 @@ async function registerForPushIfReady(): Promise<void> {
   await ensureAndroidNotificationChannel();
   await ensureLocalNotificationPermission();
 
-  const synced = await syncCachedTokenWithBackend();
-  if (synced) return;
+  await syncCachedTokenWithBackend();
 
   try {
     const { enabled } = await api.getPushConfig();
@@ -200,14 +224,20 @@ export async function initFcm(): Promise<void> {
 
   attachPushListeners();
 
-  let status = await PushNotifications.checkPermissions();
-  if (status.receive === "prompt" || status.receive === "prompt-with-rationale") {
-    if (localStorage.getItem("fcm-permission-asked") === "1") return;
-    localStorage.setItem("fcm-permission-asked", "1");
-    status = await PushNotifications.requestPermissions();
+  const status = await PushNotifications.checkPermissions();
+  if (status.receive !== "granted") {
+    if (
+      status.receive === "prompt" ||
+      status.receive === "prompt-with-rationale"
+    ) {
+      if (localStorage.getItem("fcm-permission-asked") === "1") return;
+      localStorage.setItem("fcm-permission-asked", "1");
+      const requested = await PushNotifications.requestPermissions();
+      if (requested.receive !== "granted") return;
+    } else {
+      return;
+    }
   }
-
-  if (status.receive !== "granted") return;
 
   await registerForPushIfReady();
 }
@@ -227,9 +257,6 @@ export async function enableFcm(): Promise<boolean> {
   await ensureAndroidNotificationChannel();
   await ensureLocalNotificationPermission();
 
-  const alreadySynced = await syncCachedTokenWithBackend();
-  if (alreadySynced) return true;
-
   try {
     const { enabled } = await api.getPushConfig();
     if (!enabled) {
@@ -241,24 +268,67 @@ export async function enableFcm(): Promise<boolean> {
     return false;
   }
 
+  const synced = await syncCachedTokenWithBackend();
+  if (synced) {
+    const statusOnServer = await getPushRegistrationStatus();
+    if (statusOnServer?.registered) {
+      try {
+        await api.sendTestPush();
+      } catch {
+        // Token exists on server; test push is optional.
+      }
+      return true;
+    }
+  }
+
   return new Promise<boolean>((resolve) => {
     registrationWaiter = resolve;
     void PushNotifications.register();
-    setTimeout(() => {
-      if (registrationWaiter) {
-        registrationWaiter(localStorage.getItem("fcm-enabled") === "1");
-        registrationWaiter = null;
+    setTimeout(async () => {
+      if (!registrationWaiter) return;
+      const ok = localStorage.getItem("fcm-enabled") === "1";
+      if (ok) {
+        try {
+          await api.sendTestPush();
+        } catch {
+          // ignore optional test push failure
+        }
       }
+      registrationWaiter(ok);
+      registrationWaiter = null;
     }, 12000);
   });
 }
 
 export async function isFcmEnabled(): Promise<boolean> {
   if (!isNativeApp()) return false;
-  return (await hasPushPermission()) && localStorage.getItem("fcm-enabled") === "1";
+  if (!(await hasPushPermission())) return false;
+  if (localStorage.getItem("fcm-enabled") === "1") return true;
+
+  const status = await getPushRegistrationStatus();
+  if (status?.registered) {
+    localStorage.setItem("fcm-enabled", "1");
+    return true;
+  }
+  return false;
 }
 
 export function getFcmUnsupportedReason(): string | null {
   if (!isNativeApp()) return "Install the PandaMind app to receive push notifications.";
+  return null;
+}
+
+export async function getFcmSetupError(): Promise<string | null> {
+  const status = await getPushRegistrationStatus();
+  if (!status) return "Could not reach the notification server.";
+  if (!status.configured) {
+    return "Server push is not configured yet.";
+  }
+  if (!status.projectMatches) {
+    return `Firebase project mismatch. App uses ${status.expectedAndroidProjectId}, server uses ${status.firebaseProjectId ?? "unknown"}.`;
+  }
+  if (!status.registered) {
+    return "Phone permission granted, but this device is not registered on the server yet.";
+  }
   return null;
 }

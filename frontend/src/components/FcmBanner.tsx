@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   enableFcm,
+  getFcmSetupError,
   getFcmUnsupportedReason,
+  getPushRegistrationStatus,
   isFcmEnabled,
   isNativeApp,
 } from "../lib/fcm";
+import { api } from "../lib/api";
 
 export function FcmBanner() {
   const [visible, setVisible] = useState(false);
@@ -14,15 +17,16 @@ export function FcmBanner() {
   useEffect(() => {
     if (!isNativeApp()) return;
 
-    function refreshBanner() {
-      isFcmEnabled().then((enabled) => {
-        if (enabled) {
-          setVisible(false);
-          return;
-        }
-        if (localStorage.getItem("fcm-banner-dismissed") === "1") return;
-        setVisible(true);
-      });
+    async function refreshBanner() {
+      const enabled = await isFcmEnabled();
+      if (enabled) {
+        setVisible(false);
+        return;
+      }
+      if (localStorage.getItem("fcm-banner-dismissed") === "1") return;
+      setVisible(true);
+      const setupError = await getFcmSetupError();
+      if (setupError) setError(setupError);
     }
 
     refreshBanner();
@@ -39,6 +43,12 @@ export function FcmBanner() {
       const ok = await enableFcm();
       if (ok) {
         setVisible(false);
+        return;
+      }
+
+      const setupError = await getFcmSetupError();
+      if (setupError) {
+        setError(setupError);
       } else if (localStorage.getItem("fcm-permission-asked") === "1") {
         setError(
           "Notifications allowed on phone, but server push is not configured yet. Add Firebase credentials on AWS backend."
@@ -51,6 +61,24 @@ export function FcmBanner() {
       }
     } catch {
       setError("Failed to register for notifications. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleTest() {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await getPushRegistrationStatus();
+      if (!result?.registered) {
+        setError("Device is not registered yet. Tap Enable first.");
+        return;
+      }
+      await api.sendTestPush();
+      setError("Test notification sent. Check your phone notification tray.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Test notification failed.");
     } finally {
       setLoading(false);
     }
@@ -70,7 +98,11 @@ export function FcmBanner() {
         <p className="text-[var(--wa-text)]">
           Enable notifications to get message alerts on this phone.
         </p>
-        {error ? <p className="text-red-400 text-xs mt-1">{error}</p> : null}
+        {error ? (
+          <p className={`text-xs mt-1 ${error.includes("sent") ? "text-[var(--wa-green)]" : "text-red-400"}`}>
+            {error}
+          </p>
+        ) : null}
       </div>
       <button
         type="button"
@@ -79,6 +111,14 @@ export function FcmBanner() {
         className="shrink-0 px-3 py-1.5 rounded-md bg-[var(--wa-green)] text-white text-xs font-medium disabled:opacity-50"
       >
         {loading ? "..." : "Enable"}
+      </button>
+      <button
+        type="button"
+        onClick={handleTest}
+        disabled={loading}
+        className="shrink-0 px-2 py-1.5 rounded-md border border-[var(--wa-green)]/40 text-[var(--wa-green)] text-xs font-medium disabled:opacity-50"
+      >
+        Test
       </button>
       <button
         type="button"
